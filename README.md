@@ -6,6 +6,31 @@ Modes
 - Bit count → bytes (default): interpret the input as a number of bits and convert to bytes (floor(bits / 8)). Example: "1024" (bits) becomes 128 bytes — 128 byte-grids all fully lit.
 - Binary bytes: interpret the input as a regular integer and render its canonical binary grouped into 8-bit bytes. Example: "1024" (value) becomes two bytes: 0x04 0x00.
 
+E2E tests (Playwright)
+--------------------------------
+We include Playwright tests to validate large renders and UI features. To run them locally:
+
+1. Install Node.js (if not installed) and project dev dependencies:
+
+```bash
+npm install
+npx playwright install
+```
+
+2. Start the dev server (if not already started). The Playwright config will attempt to start one automatically, but you can run it yourself first:
+
+```bash
+python app.py
+```
+
+3. Run tests:
+
+```bash
+npm run test:e2e
+```
+
+Tests will run the server at http://localhost:5000 and assert rendering behaviors, including chunked incremental rendering and keyboard shortcuts.
+
 Quick start
 
 1. Create a virtual environment and install deps:
