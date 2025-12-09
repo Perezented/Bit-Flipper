@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Bit Viewer basic UI', () => {
+test.describe('Bit Flipper basic UI', () => {
   test('default bitcount mode shows 1024 bits => 128 bytes', async ({ page }) => {
     await page.goto('/');
     // the input defaults to bitcount mode

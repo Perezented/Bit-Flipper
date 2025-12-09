@@ -285,8 +285,26 @@
     lastBits = newBitsArr.slice();
   }
 
+  const NO_ANIM_BYTE_GROUPS = 129;
+
   function staggerUpdate(newBits, { prev = [] } = {}) {
     const nodes = Array.from(bitfield.querySelectorAll('.bit'));
+    const currentByteGroups = Math.ceil(nodes.length / 8);
+
+    // If we are showing many byte groups, disable per-bit staggered animations
+    // and just apply classes directly for performance.
+    if (currentByteGroups >= NO_ANIM_BYTE_GROUPS) {
+      bitfield.classList.add('no-anim');
+      nodes.forEach((el, i) => {
+        const shouldOn = newBits[i] === '1';
+        if (shouldOn) { el.classList.add('on'); el.classList.remove('off'); }
+        else { el.classList.add('off'); el.classList.remove('on'); }
+        el.dataset.value = newBits[i];
+      });
+      return;
+    }
+    // otherwise ensure no-anim removed
+    bitfield.classList.remove('no-anim');
     const n = nodes.length || 1;
     // pick a total animation window (ms). For many nodes, keep this reasonable so per-bit delay is small.
     const totalWindow = 700; // ms
@@ -319,12 +337,19 @@
 
   // Animate a specific list of existing DOM bit nodes quickly (used for chunked rendering)
   function animateNodesQuick(bitEls, startDelay = 0, perDelay = 4) {
+    const quickNoAnim = Math.ceil(bitEls.length / 8) >= NO_ANIM_BYTE_GROUPS || bitfield.classList.contains('no-anim');
     bitEls.forEach((el, i) => {
       const shouldOn = (el.dataset.value || '0') === '1';
-      setTimeout(() => {
+      if (quickNoAnim) {
+        // directly apply final state for performance
         if (shouldOn) { el.classList.add('on'); el.classList.remove('off'); }
         else { el.classList.add('off'); el.classList.remove('on'); }
-      }, startDelay + (i * perDelay));
+      } else {
+        setTimeout(() => {
+          if (shouldOn) { el.classList.add('on'); el.classList.remove('off'); }
+          else { el.classList.add('off'); el.classList.remove('on'); }
+        }, startDelay + (i * perDelay));
+      }
     });
   }
 
@@ -347,7 +372,6 @@
     const newCircle = Math.max(6, Math.floor(circle * scale));
     bitfield.style.setProperty('--circle-size', `${newCircle}px`);
     bitfield.classList.add('scaled');
-    console.log({ byteCount });
     // Also shrink a bit when very crowded
     if (byteCount > 32) bitfield.classList.add('small');
     if (byteCount > 64) bitfield.classList.add('smaller');

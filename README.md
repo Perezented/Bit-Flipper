@@ -1,4 +1,4 @@
-# Bit Viewer
+# Bit Flipper
 
 Tiny Python web app showing numbers as binary bits grouped into 8-bit bytes with neon styling and animations.
 

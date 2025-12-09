@@ -247,6 +247,13 @@ main {
   height: calc(var(--circle-size) * 0.66);
 }
 
+/* When many byte groups are present, we disable per-bit transitions for performance */
+.no-anim .bit {
+  transition: none !important;
+  box-shadow: none;
+  /* reduce paint cost */
+}
+
 .bitfield.tiny .byte {
   padding: 4px;
 }
