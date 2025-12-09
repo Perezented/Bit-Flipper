@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Bit Viewer</title>
+        <link rel="stylesheet" href="/static/styles.css" />
+    </head>
+
+    <body>
+        <div id="app">
+            <header class="top">
+                <h1>Bit Viewer</h1>
+            </header>
+
+            <main>
+                <div class="info">
+                    <div class="controls">
+                        <label for="number-input" id="input-label">Enter bit count:</label>
+                        <input id="number-input" type="text" inputmode="numeric" placeholder="0"
+                            aria-describedby="keyboard-help" />
+                        <div class="mode-select">
+                            <label for="mode">Mode</label>
+                            <select id="mode" aria-label="View mode">
+                                <option value="bitcount">Bit count → bytes</option>
+                                <option value="binary" selected>Binary bytes</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="value small" id="value-unit">0 bytes</div>
+                </div>
+                <div id="bitfield-wrap">
+                    <div id="bitfield" class="bitfield"></div>
+                    <div id="loader" class="loader hidden" aria-hidden="true">
+                        <div class="spinner" aria-hidden="true"></div>
+                        <div class="loader-label">Rendering…</div>
+                    </div>
+                </div>
+            </main>
+
+            <footer>
+                <details class="keyboard-help" style="display:inline-block; margin-left:0.5rem;" open>
+                    <summary class="help-summary" title="Show keyboard shortcut help" style="cursor:pointer">
+                        Keyboard controls ▾
+                    </summary>
+                    <pre id="keyboard-help" class="help-content"
+                        style="white-space:pre-wrap; margin:0.5rem 0 0; padding:0.5rem; background:#111; color:#dff; border-radius:6px;">
+Arrow keys increment/decrement the numeric input
+- ArrowUp / ArrowDown change value by 1
+- Shift + Arrow -> change by 10
+- Ctrl  + Arrow -> change by 100
+- Alt   + Arrow -> change by 1000</pre>
+                </details>
+                <p>Type a number to view its bits — bytes are 8-bit grids that light up green with a neon glow.</p>
+            </footer>
+        </div>
+
+        <script src="/static/app.js"></script>
+    </body>
+
+</html>
