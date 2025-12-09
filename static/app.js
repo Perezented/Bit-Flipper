@@ -1,5 +1,5 @@
 (() => {
-  const input = document.getElementById('number-input');
+  const bitInput = document.getElementById('number-input');
   const bitfield = document.getElementById('bitfield');
   const valueUnit = document.getElementById('value-unit');
   const modeSelect = document.getElementById('mode');
@@ -234,10 +234,10 @@
 
   // throttle input handling slightly
   let timeoutId = null;
-  input.addEventListener('input', () => {
+  bitInput.addEventListener('input', () => {
     if (timeoutId) clearTimeout(timeoutId);
     timeoutId = setTimeout(() => {
-      const n = parseNumber(input.value);
+      const n = parseNumber(bitInput.value);
       render(n);
     }, 140);
   });
@@ -247,7 +247,7 @@
   // - Shift + Arrow -> change by 10
   // - Ctrl  + Arrow -> change by 100
   // - Alt   + Arrow -> change by 1000
-  input.addEventListener('keydown', (e) => {
+  bitInput.addEventListener('keydown', (e) => {
     if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
     // stop native cursor movement / selection changes
     e.preventDefault();
@@ -256,10 +256,10 @@
     const step = e.altKey ? 1000n : (e.ctrlKey ? 100n : (e.shiftKey ? 10n : 1n));
     const dir = e.key === 'ArrowUp' ? 1n : -1n;
 
-    const current = parseNumber(input.value || '0');
+    const current = parseNumber(bitInput.value || '0');
     let next = current + (step * dir);
     if (next < 0n) next = 0n;
-    input.value = next.toString();
+    bitInput.value = next.toString();
     render(next);
   });
 
@@ -269,11 +269,11 @@
       mode = e.target.value;
       if (inputLabel) {
         inputLabel.textContent = mode === 'bitcount' ? 'Enter bit count' : 'Enter integer';
-        input.value = '0';
-        input.focus();
+        bitInput.value = '255';
+        bitInput.focus();
       }
       // re-render with the new input interpretation
-      const n = parseNumber(input.value);
+      const n = parseNumber(bitInput.value);
       render(n);
     });
   }
@@ -282,8 +282,8 @@
   render(0n);
 
   // make field accept big numbers via ctrl+v paste
-  input.addEventListener('paste', (e) => {
+  bitInput.addEventListener('paste', (e) => {
     // allow paste
-    setTimeout(() => { input.dispatchEvent(new Event('input')); }, 1);
+    setTimeout(() => { bitInput.dispatchEvent(new Event('input')); }, 1);
   });
 })();
