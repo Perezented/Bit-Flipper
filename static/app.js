@@ -37,40 +37,6 @@
     return `${b % 1 === 0 ? b.toFixed(0) : b.toFixed(2)} ${units[i]}`;
   }
 
-  // Create sequential byte values filling each shown byte up to 255.
-  // Example: 256 -> [255, 1]
-  function distributeToBytes(n) {
-    let remaining = BigInt(n);
-    const parts = [];
-    const MAX = 255n;
-    while (remaining > 0n) {
-      if (remaining > MAX) {
-        parts.push(255);
-        remaining -= MAX;
-      } else {
-        parts.push(Number(remaining));
-        remaining = 0n;
-      }
-    }
-    if (parts.length === 0) parts.push(0);
-    return parts; // LSB-first: parts[0] is the first grid shown (least significant bit (LSb))
-  }
-
-  function byteToBits(num) {
-    // turns number 0..255 into array of '0'/'1' length 8, msb->lsb left-to-right (most significant bit first)
-    const bits = [];
-    for (let i = 7; i >= 0; i--) {
-      bits.push(((num >> i) & 1) === 1 ? '1' : '0');
-    }
-    return bits;
-  }
-  (function() {
-    const START = 2025;
-    const now = new Date().getFullYear();
-    const el = document.getElementById('copyright-year');
-    if (el) el.textContent = now === START ? String(START) : `${START} - ${now}`;
-  })();
-
   // Grouping constants (bytes)
   // We treat a "KB block" here as 1024 bytes (8192 bits).
   const GROUP_BYTES = 1024; // a KB block in our UI = 1024 bytes
@@ -82,6 +48,10 @@
     // value is a BigInt from the input; interpretation depends on `mode`.
     let bytes = [];
     let bytesCountForUnit = 0n;
+    const START = 2025;
+    const now = new Date().getFullYear();
+    const el = document.getElementById('copyright-year');
+    if (el) el.textContent = now === START ? String(START) : `${START} - ${now}`;
     // (render-level constants moved to top for consistency)
 
     if (mode === 'bitcount') {
