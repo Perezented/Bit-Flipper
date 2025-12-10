@@ -142,6 +142,25 @@
       // determine whether we should render at MB level (groups of GROUPS_PER_LEVEL KBs)
       var useMbLevel = kbGroups.length >= GROUPS_PER_LEVEL;
       var mbGroups = null;
+
+      // If the server can help compute summaries for very large inputs (and we
+      // are rendering MB-level summaries), fetch the per-KB fraction summary
+      // as an optional performance optimization. The server endpoint returns
+      // an array of fractions (0..1) indicating how many bits are set in each
+      // KB group for the bitcount mode.
+      async function tryServerSummary() {
+        try {
+          const res = await fetch('/api/group_summary', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: String(totalBits), mode: 'bitcount' })
+          });
+          if (!res.ok) return null;
+          const body = await res.json();
+          if (body && Array.isArray(body.kb_fractions)) return body.kb_fractions;
+        } catch (e) { /* ignore and fallback */ }
+        return null;
+      }
       if (useMbLevel) {
         mbGroups = [];
         for (let i = 0; i < kbGroups.length; i += GROUPS_PER_LEVEL) mbGroups.push(kbGroups.slice(i, i + GROUPS_PER_LEVEL));
@@ -197,32 +216,50 @@
           bitfield.appendChild(byteEl);
         };
 
-        // helper to append a single KB group DOM (128×64 grid — 8192 bits)
+        // helper to draw a single KB group on canvas (128×64 pixels, 8192 bits)
+        // canvas is much more efficient than 8192 DOM elements
+        const drawKbBlock = (canvas, chunkBits) => {
+          const cols = 128;
+          const rows = 64;
+          const pixelSize = 1; // 1 pixel per bit
+          const ctx = canvas.getContext('2d');
+          canvas.width = cols * pixelSize;
+          canvas.height = rows * pixelSize;
+
+          // fill background
+          ctx.fillStyle = 'rgba(0,0,0,1)';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          // draw bits as pixels
+          ctx.fillStyle = '#00ff99'; // neon green, matching --fg
+          for (let i = 0; i < BITS_PER_GROUP; i++) {
+            if (chunkBits[i] === '1') {
+              const row = Math.floor(i / cols);
+              const col = i % cols;
+              ctx.fillRect(col * pixelSize, row * pixelSize, pixelSize, pixelSize);
+            }
+          }
+        };
+
+        // helper to append a single KB group as a canvas element
         const appendKb = (chunkBits, idx) => {
           const el = document.createElement('div');
           el.className = 'kb-block';
           el.dataset.kbIndex = idx;
-          const grid = document.createElement('div');
-          grid.className = 'kb-grid';
-          // chunkBits is a string of length up to BITS_PER_GROUP
-          for (let i = 0; i < BITS_PER_GROUP; i++) {
-            const c = document.createElement('div');
-            c.className = 'cell off';
-            c.dataset.cellIndex = i;
-            const v = chunkBits[i] === '1' ? '1' : '0';
-            c.dataset.value = v;
-            if (v === '1') c.classList.add('on');
-            grid.appendChild(c);
-          }
+          const canvas = document.createElement('canvas');
+          canvas.className = 'kb-canvas';
+          canvas.dataset.kbIndex = idx;
+          drawKbBlock(canvas, chunkBits);
           const title = document.createElement('div');
           title.className = 'kb-title';
           title.textContent = `KB ${idx}`;
-          el.appendChild(grid);
+          el.appendChild(canvas);
           el.appendChild(title);
           bitfield.appendChild(el);
         };
 
         // helper to append an MB group DOM (collection of GROUPS_PER_LEVEL KB tiles)
+        // mbArray can be an array of KB bit-strings or an array of per-KB fractions (numbers 0..1)
         const appendMb = (mbArray, idx) => {
           const mbEl = document.createElement('div');
           mbEl.className = 'mb-block';
@@ -232,8 +269,13 @@
           mbArray.forEach((kbBits) => {
             const tile = document.createElement('div');
             tile.className = 'tile';
-            const ones = (kbBits.match(/1/g) || []).length;
-            const frac = ones / BITS_PER_GROUP;
+            let frac = 0;
+            if (typeof kbBits === 'string') {
+              const ones = (kbBits.match(/1/g) || []).length;
+              frac = ones / BITS_PER_GROUP;
+            } else if (typeof kbBits === 'number') {
+              frac = kbBits;
+            }
             tile.style.background = `rgba(0,255,120,${0.04 + frac * 0.9})`;
             tile.dataset.value = frac > 0 ? '1' : '0';
             if (frac > 0.01) tile.classList.add('on');
@@ -257,7 +299,19 @@
             // build MB groups (each MB contains up to GROUPS_PER_LEVEL KB groups)
             const mbGroups = [];
             for (let i = 0; i < kbGroups.length; i += GROUPS_PER_LEVEL) mbGroups.push(kbGroups.slice(i, i + GROUPS_PER_LEVEL));
-            if (totalCells < CHUNK_CELL_THRESHOLD) mbGroups.forEach((mb, mIdx) => appendMb(mb, mIdx));
+            if (totalCells < CHUNK_CELL_THRESHOLD) {
+              // Try to use server-side per-KB fractions to drive MB tiles;
+              // fall back to the detailed MB groups if none available.
+              tryServerSummary().then((kbFractions) => {
+                if (kbFractions && kbFractions.length === kbGroups.length) {
+                  const mbFracs = [];
+                  for (let i = 0; i < kbFractions.length; i += GROUPS_PER_LEVEL) mbFracs.push(kbFractions.slice(i, i + GROUPS_PER_LEVEL));
+                  mbFracs.forEach((mbf, mIdx) => appendMb(mbf, mIdx));
+                } else {
+                  mbGroups.forEach((mb, mIdx) => appendMb(mb, mIdx));
+                }
+              }).catch(() => { mbGroups.forEach((mb, mIdx) => appendMb(mb, mIdx)); });
+            }
           }
         } else if (totalCells < CHUNK_CELL_THRESHOLD) {
           bytes.forEach((b, idx) => {
