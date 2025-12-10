@@ -3,6 +3,12 @@
   const bitfield = document.getElementById('bitfield');
   const valueUnit = document.getElementById('value-unit');
   const modeSelect = document.getElementById('mode');
+  const loader = document.getElementById('loader');
+
+  const chunkSize = 512; // groups per chunk when chunking (for byte-level)
+  const CHUNK_CELL_THRESHOLD = 100000; // total bit cells to trigger chunked rendering
+  const NO_ANIM_BYTE_GROUPS = 128; // disable per-bit animation above this many byte groups
+
   const inputLabel = document.getElementById('input-label');
 
   // default mode: "binary" (treat input as a number of bits and show bytes)
@@ -64,10 +70,19 @@
     const el = document.getElementById('copyright-year');
     if (el) el.textContent = now === START ? String(START) : `${START} - ${now}`;
   })();
+
+  // Grouping constants (bytes)
+  // We treat a "KB block" here as 1024 bytes (8192 bits).
+  const GROUP_BYTES = 1024; // a KB block in our UI = 1024 bytes
+  const BITS_PER_GROUP = GROUP_BYTES * 8; // 8192 bits per visual KB block
+  // Make an MB-level group be 1024 KB groups (follows binary units: 1024 KB = 1 MB)
+  const GROUPS_PER_LEVEL = 1024; // how many KB blocks make an MB
+
   function render(value) {
     // value is a BigInt from the input; interpretation depends on `mode`.
     let bytes = [];
     let bytesCountForUnit = 0n;
+    // (render-level constants moved to top for consistency)
 
     if (mode === 'bitcount') {
       // interpret `value` as a bit count
@@ -106,29 +121,145 @@
     // For bitcount mode show number of bytes derived from bits; for binary mode show the integer in bytes units
     valueUnit.textContent = humanizeBytes(bytesCountForUnit);
 
-    // compute and set sizing classes based on number of bytes and container width
-    adjustSizing(bytes.length);
+    // compute and set sizing classes after grouping decision below (moved)
 
     // now build or update DOM
     const newBitsFlat = bytes.flat().join('');
+    // determine grouping for bitcount mode: if there are many bytes, show KB blocks
+    const useGrouping = mode === 'bitcount' && bytes.length >= GROUP_BYTES;
+    // when grouping, build KB groups (each is BITS_PER_GROUP bits, now 8192 bits)
+    let kbGroups = null; // array of strings (each length BITS_PER_GROUP)
+    if (useGrouping) {
+      kbGroups = [];
+      const totalBits = newBitsFlat.length;
+      const groupCount = Math.ceil(totalBits / BITS_PER_GROUP);
+      for (let gi = 0; gi < groupCount; gi++) {
+        const start = gi * BITS_PER_GROUP;
+        const chunk = newBitsFlat.slice(start, start + BITS_PER_GROUP);
+        // pad chunk to full length for consistent UI
+        kbGroups.push(chunk.padEnd(BITS_PER_GROUP, '0'));
+      }
+      // determine whether we should render at MB level (groups of GROUPS_PER_LEVEL KBs)
+      var useMbLevel = kbGroups.length >= GROUPS_PER_LEVEL;
+      var mbGroups = null;
+      if (useMbLevel) {
+        mbGroups = [];
+        for (let i = 0; i < kbGroups.length; i += GROUPS_PER_LEVEL) mbGroups.push(kbGroups.slice(i, i + GROUPS_PER_LEVEL));
+      }
+    }
+
+    // compute display count and sizing after grouping info is available
+    const displayCount = useGrouping ? (useMbLevel ? mbGroups.length : kbGroups.length) : bytes.length;
+    adjustSizing(displayCount, useGrouping);
     // if we already rendered something, capture the current bit string so we can
     // decide whether a full rebuild is needed (length differs) or we can update in-place
-    const currentBitsFlat = bitfield.dataset.rendered ? Array.from(bitfield.querySelectorAll('.bit')).map(b => b.dataset.value || '0').join('') : null;
-    // if we're asked to render many byte-groups, show a loader and render asynchronously
+    const currentBitsFlat = bitfield.dataset.rendered ? Array.from(bitfield.querySelectorAll('.bit, .cell')).map(b => b.dataset.value || '0').join('') : null;
+    // If we're grouping, we'll render groups (kbGroups) instead of individual bytes
+    // if we're asked to render many items (bytes or groups), show a loader and render asynchronously
+    const totalCells = bytes.length * 8;
     const loader = document.getElementById('loader');
     const heavyThreshold = 180; // number of byte groups considered heavy to render
-    const chunkedThreshold = 10000; // if >= this many byte-groups, do incremental chunked rendering
-    const chunkSize = 256; // groups per chunk when chunking
+    // chunkedThreshold & chunkSize are defined at top-level
     if (!render.__token) render.__token = 0; // token to cancel in-progress chunking
     const myToken = ++render.__token;
 
-    const renderDom = () => {
+    // Always render data (possibly via chunked renderer) so
+    // the app shows visual output for all inputs.
+    if (bitfield.dataset.expanded) delete bitfield.dataset.expanded;
+
+    function renderDom() {
       // if no existing nodes, render fresh
       if (!bitfield.dataset.rendered) {
         bitfield.innerHTML = '';
         // If chunking will be used, skip appending here and delegate to the chunked path below.
         // Otherwise, append all bytes at once (fast path for smaller renders).
-        if (bytes.length < chunkedThreshold) {
+        // helper to append a single byte DOM
+        const appendByte = (b, idx) => {
+          const byteEl = document.createElement('div');
+          byteEl.className = 'byte';
+          byteEl.dataset.byteIndex = idx;
+          // show bits left->right
+          const row = document.createElement('div');
+          row.className = 'row';
+          b.forEach((bit, bi) => {
+            const el = document.createElement('div');
+            el.className = 'bit off';
+            el.dataset.bitIndex = bi;
+            el.dataset.value = bit;
+            row.appendChild(el);
+          });
+          const title = document.createElement('div');
+          title.className = 'byte-title';
+          // show byte index left-to-right with the first grid being byte 0 (LSB)
+          title.textContent = mode === 'bitcount' ? `byte group ${idx}` : `binary group ${idx}`;
+          byteEl.appendChild(row);
+          byteEl.appendChild(title);
+          bitfield.appendChild(byteEl);
+        };
+
+        // helper to append a single KB group DOM (128×64 grid — 8192 bits)
+        const appendKb = (chunkBits, idx) => {
+          const el = document.createElement('div');
+          el.className = 'kb-block';
+          el.dataset.kbIndex = idx;
+          const grid = document.createElement('div');
+          grid.className = 'kb-grid';
+          // chunkBits is a string of length up to BITS_PER_GROUP
+          for (let i = 0; i < BITS_PER_GROUP; i++) {
+            const c = document.createElement('div');
+            c.className = 'cell off';
+            c.dataset.cellIndex = i;
+            const v = chunkBits[i] === '1' ? '1' : '0';
+            c.dataset.value = v;
+            if (v === '1') c.classList.add('on');
+            grid.appendChild(c);
+          }
+          const title = document.createElement('div');
+          title.className = 'kb-title';
+          title.textContent = `KB ${idx}`;
+          el.appendChild(grid);
+          el.appendChild(title);
+          bitfield.appendChild(el);
+        };
+
+        // helper to append an MB group DOM (collection of GROUPS_PER_LEVEL KB tiles)
+        const appendMb = (mbArray, idx) => {
+          const mbEl = document.createElement('div');
+          mbEl.className = 'mb-block';
+          mbEl.dataset.mbIndex = idx;
+          const mbGrid = document.createElement('div');
+          mbGrid.className = 'mb-grid';
+          mbArray.forEach((kbBits) => {
+            const tile = document.createElement('div');
+            tile.className = 'tile';
+            const ones = (kbBits.match(/1/g) || []).length;
+            const frac = ones / BITS_PER_GROUP;
+            tile.style.background = `rgba(0,255,120,${0.04 + frac * 0.9})`;
+            tile.dataset.value = frac > 0 ? '1' : '0';
+            if (frac > 0.01) tile.classList.add('on');
+            mbGrid.appendChild(tile);
+          });
+          const title = document.createElement('div');
+          title.className = 'mb-title';
+          title.textContent = `MB ${idx}`;
+          mbEl.appendChild(mbGrid);
+          mbEl.appendChild(title);
+          bitfield.appendChild(mbEl);
+        };
+
+        if (useGrouping) {
+          // determine MB-level grouping (each MB = GROUPS_PER_LEVEL KB groups)
+          const useMbLevel = kbGroups.length >= GROUPS_PER_LEVEL;
+          if (!useMbLevel) {
+            // append KB groups directly when not chunking
+            if (totalCells < CHUNK_CELL_THRESHOLD) kbGroups.forEach((b, idx) => appendKb(b, idx));
+          } else {
+            // build MB groups (each MB contains up to GROUPS_PER_LEVEL KB groups)
+            const mbGroups = [];
+            for (let i = 0; i < kbGroups.length; i += GROUPS_PER_LEVEL) mbGroups.push(kbGroups.slice(i, i + GROUPS_PER_LEVEL));
+            if (totalCells < CHUNK_CELL_THRESHOLD) mbGroups.forEach((mb, mIdx) => appendMb(mb, mIdx));
+          }
+        } else if (totalCells < CHUNK_CELL_THRESHOLD) {
           bytes.forEach((b, idx) => {
             const byteEl = document.createElement('div');
             byteEl.className = 'byte';
@@ -152,54 +283,61 @@
             bitfield.appendChild(byteEl);
           });
         }
-        // chunked rendering for very large byte counts
-        if (bytes.length >= chunkedThreshold) {
+
+        // chunked rendering for very large counts / groups
+        // decide effective chunk size depending on grouping and level
+        let effectiveChunkSize;
+        const totalItems = useGrouping ? (useMbLevel ? mbGroups.length : kbGroups.length) : bytes.length;
+        if (useGrouping) {
+          effectiveChunkSize = useMbLevel ? 2 : 8; // add only a few KBs or MBs per chunk
+        } else {
+          effectiveChunkSize = chunkSize;
+        }
+        if (totalCells >= CHUNK_CELL_THRESHOLD) {
           bitfield.innerHTML = '';
           let appended = 0;
           let chunkIdx = 0;
-          const totalChunks = Math.ceil(bytes.length / chunkSize);
+          const totalChunks = Math.ceil(totalItems / effectiveChunkSize);
 
           const appendChunk = () => {
             if (render.__token !== myToken) return; // aborted
-            const start = chunkIdx * chunkSize;
-            const end = Math.min(bytes.length, start + chunkSize);
+            const start = chunkIdx * effectiveChunkSize;
+            const end = Math.min(totalItems, start + effectiveChunkSize);
             for (let idx = start; idx < end; idx++) {
-              const b = bytes[idx];
-              const byteEl = document.createElement('div');
-              byteEl.className = 'byte';
-              byteEl.dataset.byteIndex = idx;
-              const row = document.createElement('div');
-              row.className = 'row';
-              b.forEach((bit, bi) => {
-                const el = document.createElement('div');
-                el.className = 'bit off';
-                el.dataset.bitIndex = bi;
-                el.dataset.value = bit;
-                row.appendChild(el);
-              });
-              const title = document.createElement('div');
-              title.className = 'byte-title';
-              title.textContent = mode === 'bitcount' ? `byte group ${idx}` : `binary group ${idx}`;
-              byteEl.appendChild(row);
-              byteEl.appendChild(title);
-              bitfield.appendChild(byteEl);
+              if (useGrouping) {
+                if (useMbLevel) appendMb(mbGroups[idx], idx);
+                else appendKb(kbGroups[idx], idx);
+              } else {
+                appendByte(bytes[idx], idx);
+              }
             }
             appended += (end - start);
             chunkIdx++;
-            if (loader) loader.querySelector('.loader-label').textContent = `Rendering… ${Math.round(appended / bytes.length * 100)}%`;
+            if (loader) loader.querySelector('.loader-label').textContent = `Rendering… ${Math.round(appended / totalItems * 100)}%`;
 
             // animate the freshly added slice using a small, quick animation window
-            const sliceStart = start * 8;
-            const sliceEnd = end * 8;
-            const sliceNodes = Array.from(bitfield.querySelectorAll('.bit')).slice(sliceStart, sliceEnd);
-            if (sliceNodes.length) animateNodesQuick(sliceNodes, 6, 2);
+            // for chunked append animate the newly added nodes
+            if (useGrouping) {
+              if (useMbLevel) {
+                const sliceNodes = Array.from(bitfield.querySelectorAll('.mb-block')).slice(start, end).flatMap(b => Array.from(b.querySelectorAll('.tile')));
+                if (sliceNodes.length) animateNodesQuick(sliceNodes, 6, 2);
+              } else {
+                const sliceNodes = Array.from(bitfield.querySelectorAll('.kb-block')).slice(start, end).flatMap(b => Array.from(b.querySelectorAll('.cell')));
+                if (sliceNodes.length) animateNodesQuick(sliceNodes, 6, 2);
+              }
+            } else {
+              const sliceStart = start * 8;
+              const sliceEnd = end * 8;
+              const sliceNodes = Array.from(bitfield.querySelectorAll('.bit, .cell')).slice(sliceStart, sliceEnd);
+              if (sliceNodes.length) animateNodesQuick(sliceNodes, 6, 2);
+            }
 
-            if (end < bytes.length) {
+            if (end < totalItems) {
               setTimeout(appendChunk, 12);
             } else {
               // finished
               bitfield.dataset.rendered = 'true';
-              lastBits = Array.from(bitfield.querySelectorAll('.bit')).map(n => n.dataset.value || '0');
+              lastBits = Array.from(bitfield.querySelectorAll('.bit, .cell')).map(n => n.dataset.value || '0');
               if (loader) { loader.classList.add('hidden'); loader.setAttribute('aria-hidden', 'true'); }
             }
           };
@@ -219,13 +357,13 @@
     };
 
     // Decide how to schedule rendering
-    if (bytes.length >= chunkedThreshold) {
+    if (totalCells >= CHUNK_CELL_THRESHOLD) {
       // if we already have the DOM and the flat bit length matches, this is an in-place update
       if (bitfield.dataset.rendered && currentBitsFlat !== null && currentBitsFlat.length === newBitsFlat.length) {
         // update element dataset values and animate differences
         const newBitsArr = newBitsFlat.split('');
-        const prevBitsArr = Array.from(bitfield.querySelectorAll('.bit')).map(b => b.dataset.value || '0');
-        const nodes = Array.from(bitfield.querySelectorAll('.bit'));
+        const prevBitsArr = Array.from(bitfield.querySelectorAll('.bit, .cell')).map(b => b.dataset.value || '0');
+        const nodes = Array.from(bitfield.querySelectorAll('.bit, .cell'));
         nodes.forEach((el, i) => { el.dataset.value = newBitsArr[i]; });
         staggerUpdate(newBitsArr, { prev: prevBitsArr });
         lastBits = newBitsArr.slice();
@@ -245,8 +383,8 @@
       if (bitfield.dataset.rendered && currentBitsFlat !== null && currentBitsFlat.length === newBitsFlat.length) {
         // same structure, just update values
         const newBitsArr = newBitsFlat.split('');
-        const prevBitsArr = Array.from(bitfield.querySelectorAll('.bit')).map(b => b.dataset.value || '0');
-        const nodes = Array.from(bitfield.querySelectorAll('.bit'));
+        const prevBitsArr = Array.from(bitfield.querySelectorAll('.bit, .cell')).map(b => b.dataset.value || '0');
+        const nodes = Array.from(bitfield.querySelectorAll('.bit, .cell'));
         nodes.forEach((el, i) => { el.dataset.value = newBitsArr[i]; });
         staggerUpdate(newBitsArr, { prev: prevBitsArr });
         lastBits = newBitsArr.slice();
@@ -278,10 +416,10 @@
 
     // otherwise animate differences
     const newBitsArr = newBitsFlat.split('');
-    const prevBitsArr = Array.from(bitfield.querySelectorAll('.bit')).map(b => b.dataset.value || '0');
+    const prevBitsArr = Array.from(bitfield.querySelectorAll('.bit, .cell')).map(b => b.dataset.value || '0');
 
     // update element dataset values and animate on/off
-    const nodes = Array.from(bitfield.querySelectorAll('.bit'));
+    const nodes = Array.from(bitfield.querySelectorAll('.bit, .cell'));
     nodes.forEach((el, i) => {
       el.dataset.value = newBitsArr[i];
     });
@@ -290,10 +428,41 @@
     lastBits = newBitsArr.slice();
   }
 
-  const NO_ANIM_BYTE_GROUPS = 129;
+  // wire cancel button to abort long renders
+  const cancelBtn = document.getElementById('cancel-render');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', () => {
+      if (!render.__token) render.__token = 0;
+      // increment token to cancel any in-progress chunking
+      render.__token++;
+      // hide loader
+      if (loader) { loader.classList.add('hidden'); loader.setAttribute('aria-hidden', 'true'); }
+      // provide some visual feedback in the loader label
+      if (loader) {
+        const groupsRendered = bitfield.querySelectorAll('.byte, .kb-block, .mb-block').length;
+        loader.querySelector('.loader-label').textContent = `Render cancelled — ${groupsRendered.toLocaleString()} groups rendered`;
+        // keep the message briefly visible, then hide loader
+        setTimeout(() => { loader.classList.add('hidden'); loader.setAttribute('aria-hidden', 'true'); }, 900);
+      }
+    });
+  }
+
+  // wire the mobile step buttons
+  document.querySelectorAll('.step-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const el = e.currentTarget;
+      const step = BigInt(Number(el.getAttribute('data-step') || '1'));
+      const action = el.getAttribute('data-action');
+      const current = parseNumber(bitInput.value || '0');
+      let next = action === 'decrement' ? current - step : current + step;
+      if (next < 0n) next = 0n;
+      bitInput.value = next.toString();
+      render(next);
+    });
+  });
 
   function staggerUpdate(newBits, { prev = [] } = {}) {
-    const nodes = Array.from(bitfield.querySelectorAll('.bit'));
+    const nodes = Array.from(bitfield.querySelectorAll('.bit, .cell'));
     const currentByteGroups = Math.ceil(nodes.length / 8);
 
     // If we are showing many byte groups, disable per-bit staggered animations
@@ -358,7 +527,7 @@
     });
   }
 
-  function adjustSizing(byteCount) {
+  function adjustSizing(byteCount, isGrouped = false) {
     // decide how cramped it is. Measure container width and estimated byte width.
     const wrap = document.getElementById('bitfield-wrap');
     const containerW = wrap.clientWidth || wrap.getBoundingClientRect().width;
@@ -366,7 +535,13 @@
     const circle = parseFloat(computed.getPropertyValue('--circle-size')) || 36;
     const gap = parseFloat(computed.getPropertyValue('--gap')) || 10;
     // rough estimate: each byte has 8 bits + padding, but bits arranged in single row; each bit width + gaps
-    const byteWidth = (circle * 8) + (7 * 6) + 40; // bit sizes + spacing + padding approx
+    let byteWidth;
+    if (isGrouped) {
+      // approximate KB-block width (matches .kb-grid width + container padding)
+      byteWidth = 260 + 24; // grid + some padding
+    } else {
+      byteWidth = (circle * 8) + (7 * 6) + 40; // bit sizes + spacing + padding approx
+    }
     const totalWidth = byteCount * byteWidth;
 
     bitfield.classList.remove('small', 'smaller', 'tiny', 'tinier', 'scaled');

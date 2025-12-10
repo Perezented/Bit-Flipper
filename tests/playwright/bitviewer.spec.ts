@@ -3,7 +3,8 @@ import { test, expect } from '@playwright/test';
 test.describe('Bit Flipper basic UI', () => {
   test('default bitcount mode shows 1024 bits => 128 bytes', async ({ page }) => {
     await page.goto('/');
-    // the input defaults to bitcount mode
+    // ensure we're in bitcount mode
+    await page.selectOption('#mode', 'bitcount');
     const input = page.locator('#number-input');
     await input.fill('1024');
     // wait for rendered bytes to appear
@@ -14,17 +15,18 @@ test.describe('Bit Flipper basic UI', () => {
   test('chunked rendering shows loader and completes for large inputs', async ({ page }) => {
     await page.goto('/');
     const input = page.locator('#number-input');
-    // 100000 bits => 12500 bytes which exceeds the chunk threshold
-    await input.fill('100000');
+    // treat the input as a bitcount -> large value will render via chunked path
+    // ensure we're in bitcount mode
+    await page.selectOption('#mode', 'bitcount');
+    await input.fill('500000');
 
-    // loader should appear quickly
+    // loader should appear then hide once finished, and we should have the KB
+    // groups rendered for this input. (500k bits -> 62500 bytes -> 62 KB groups)
     const loader = page.locator('#loader');
     await expect(loader).toBeVisible({ timeout: 5000 });
-
-    // finally the loader will hide and the expected number of bytes should be present
     await expect(loader).toBeHidden({ timeout: 120000 });
-    const bytes = page.locator('.byte');
-    await expect(bytes).toHaveCount(12500, { timeout: 120000 });
+    const kbs = page.locator('.kb-block');
+    await expect(kbs).toHaveCount(62, { timeout: 120000 });
   });
 
   test('modifier shortcut hints visible and arrow modifiers change value', async ({ page }) => {
