@@ -1,6 +1,6 @@
 (() => {
   const numberInput = document.getElementById('number-input');
-  const bitField = document.getElementById('bitfield');
+  const bitField = document.getElementById('bitField');
   const valueUnit = document.getElementById('value-unit');
   const modeSelect = document.getElementById('mode');
   const loader = document.getElementById('loader');
@@ -573,7 +573,7 @@
 
   function adjustSizing(byteCount, isGrouped = false) {
     // decide how cramped it is. Measure container width and estimated byte width.
-    const wrap = document.getElementById('bitfield-wrap');
+    const wrap = document.getElementById('bitField-wrap');
     const containerW = wrap.clientWidth || wrap.getBoundingClientRect().width;
     const computed = getComputedStyle(document.documentElement);
     const circle = parseFloat(computed.getPropertyValue('--circle-size')) || 36;

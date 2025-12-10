@@ -149,14 +149,14 @@ main {
   margin-top: 6px;
 }
 
-#bitfield-wrap {
+#bitField-wrap {
   width: 100%;
   max-width: 1400px;
   padding: 18px;
   position: relative;
 }
 
-.bitfield {
+.bitField {
   display: flex;
   flex-wrap: wrap;
   gap: var(--gap);
@@ -224,20 +224,20 @@ main {
 }
 
 /* when container is cramped we reduce size using a helper class set by JS */
-.bitfield.small .byte {
+.bitField.small .byte {
   padding: 8px;
 }
 
-.bitfield.small .bit {
+.bitField.small .bit {
   width: calc(var(--circle-size) * 0.8);
   height: calc(var(--circle-size) * 0.8);
 }
 
-.bitfield.smaller .byte {
+.bitField.smaller .byte {
   padding: 6px;
 }
 
-.bitfield.smaller .bit {
+.bitField.smaller .bit {
   width: calc(var(--circle-size) * 0.66);
   height: calc(var(--circle-size) * 0.66);
 }
@@ -336,21 +336,21 @@ main {
   /* reduce paint cost */
 }
 
-.bitfield.tiny .byte {
+.bitField.tiny .byte {
   padding: 4px;
 }
 
-.bitfield.tiny .bit {
+.bitField.tiny .bit {
   width: calc(var(--circle-size) * 0.5);
   height: calc(var(--circle-size) * 0.5);
 }
 
-.bitfield.tinier .byte {
+.bitField.tinier .byte {
   padding: 4px;
 }
 
 
-.bitfield.tinier .byte {
+.bitField.tinier .byte {
   width: calc(var(--circle-size) * 0.45);
   height: calc(var(--circle-size) * 0.45);
 }
@@ -415,7 +415,7 @@ main {
 }
 
 /* allow per-container circle size override (set by JS) */
-#bitfield {
+#bitField {
   --circle-size: var(--circle-size);
 }
 
