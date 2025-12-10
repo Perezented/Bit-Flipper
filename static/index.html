@@ -28,20 +28,87 @@
                             </select>
                         </div>
                     </div>
-                    <div class="modifier-tip" aria-hidden="false">
+
+                    <!-- Desktop: original shortcut tip -->
+                    <div class="modifier-tip desktop-only" aria-hidden="false">
                         <strong>Shortcuts</strong>
                         <span class="keys">Arrow ↑/↓</span> ±1
                         <span class="keys">Shift + Arrow</span> ±10
                         <span class="keys">Ctrl + Arrow</span> ±100
                         <span class="keys">Alt + Arrow</span> ±1000
                     </div>
+
+                    <!-- Mobile: quick increment/decrement buttons -->
+                    <div class="mobile-only" role="group" aria-label="Quick adjust buttons" aria-hidden="false">
+                        <table class="step-table" role="presentation"
+                            style="border-collapse:separate; border-spacing:1rem;">
+                            <thead>
+                                <tr>
+                                    <th class="step-label" scope="col" title="Adjust by 10">±10</th>
+                                    <th class="step-label" scope="col" title="Adjust by 64">±64</th>
+                                    <th class="step-label" scope="col" title="Adjust by 128">±128</th>
+                                    <th class="step-label" scope="col" title="Adjust by 512">±512</th>
+                                    <th class="step-label" scope="col" title="Adjust by 1024">±1024</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr style="padding-top: 1rem; padding-bottom: 1rem;">
+                                    <td>
+                                        <button type="button" class="step-btn" data-step="10" data-action="increment"
+                                            aria-controls="number-input" aria-label="Increase by 10">+10</button>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="step-btn" data-step="64" data-action="increment"
+                                            aria-controls="number-input" aria-label="Increase by 64">+64</button>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="step-btn" data-step="128" data-action="increment"
+                                            aria-controls="number-input" aria-label="Increase by 128">+128</button>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="step-btn" data-step="512" data-action="increment"
+                                            aria-controls="number-input" aria-label="Increase by 512">+512</button>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="step-btn" data-step="1024" data-action="increment"
+                                            aria-controls="number-input" aria-label="Increase by 1024">+1024</button>
+                                    </td>
+                                </tr>
+
+                                <tr style="padding-top: 1rem; padding-bottom: 1rem;">
+                                    <td>
+                                        <button type="button" class="step-btn" data-step="10" data-action="decrement"
+                                            aria-controls="number-input" aria-label="Decrease by 10">−10</button>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="step-btn" data-step="64" data-action="decrement"
+                                            aria-controls="number-input" aria-label="Decrease by 64">−64</button>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="step-btn" data-step="128" data-action="decrement"
+                                            aria-controls="number-input" aria-label="Decrease by 128">−128</button>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="step-btn" data-step="512" data-action="decrement"
+                                            aria-controls="number-input" aria-label="Decrease by 512">−512</button>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="step-btn" data-step="1024" data-action="decrement"
+                                            aria-controls="number-input" aria-label="Decrease by 1024">−1024</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                     <div class="value small" id="value-unit">0 bytes</div>
                 </div>
                 <div id="bitfield-wrap">
+                    <div id="collapsed-summary" class="collapsed-summary hidden" aria-hidden="true"></div>
                     <div id="bitfield" class="bitfield"></div>
                     <div id="loader" class="loader hidden" aria-hidden="true">
                         <div class="spinner" aria-hidden="true"></div>
                         <div class="loader-label">Rendering…</div>
+                        <button id="cancel-render" class="cancel-btn" aria-label="Cancel render">Cancel</button>
                     </div>
                 </div>
             </main>
@@ -60,6 +127,10 @@ Arrow keys increment/decrement the numeric input
 - Alt   + Arrow -> change by 1000</pre>
                 </details>
                 <p>Type a number to view its bits — bytes are 8-bit grids that light up green with a neon glow.</p>
+                <p>
+                    &copy; <span id="copyright-year"></span>
+                    <a href="https://perezented-portfolio.vercel.app" target="_blank" rel="noopener">Michael Perez</a>
+                </p>
             </footer>
         </div>
 

@@ -58,7 +58,12 @@
     }
     return bits;
   }
-
+  (function() {
+    const START = 2025;
+    const now = new Date().getFullYear();
+    const el = document.getElementById('copyright-year');
+    if (el) el.textContent = now === START ? String(START) : `${START} - ${now}`;
+  })();
   function render(value) {
     // value is a BigInt from the input; interpretation depends on `mode`.
     let bytes = [];
