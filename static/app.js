@@ -1,6 +1,6 @@
 (() => {
-  const bitInput = document.getElementById('number-input');
-  const bitfield = document.getElementById('bitfield');
+  const numberInput = document.getElementById('number-input');
+  const bitField = document.getElementById('bitfield');
   const valueUnit = document.getElementById('value-unit');
   const modeSelect = document.getElementById('mode');
   const loader = document.getElementById('loader');
@@ -142,7 +142,7 @@
     adjustSizing(displayCount, useGrouping);
     // if we already rendered something, capture the current bit string so we can
     // decide whether a full rebuild is needed (length differs) or we can update in-place
-    const currentBitsFlat = bitfield.dataset.rendered ? Array.from(bitfield.querySelectorAll('.bit, .cell')).map(b => b.dataset.value || '0').join('') : null;
+    const currentBitsFlat = bitField.dataset.rendered ? Array.from(bitField.querySelectorAll('.bit, .cell')).map(b => b.dataset.value || '0').join('') : null;
     // If we're grouping, we'll render groups (kbGroups) instead of individual bytes
     // if we're asked to render many items (bytes or groups), show a loader and render asynchronously
     const totalCells = bytes.length * 8;
@@ -154,12 +154,12 @@
 
     // Always render data (possibly via chunked renderer) so
     // the app shows visual output for all inputs.
-    if (bitfield.dataset.expanded) delete bitfield.dataset.expanded;
+    if (bitField.dataset.expanded) delete bitField.dataset.expanded;
 
     function renderDom() {
       // if no existing nodes, render fresh
-      if (!bitfield.dataset.rendered) {
-        bitfield.innerHTML = '';
+      if (!bitField.dataset.rendered) {
+        bitField.innerHTML = '';
         // If chunking will be used, skip appending here and delegate to the chunked path below.
         // Otherwise, append all bytes at once (fast path for smaller renders).
         // helper to append a single byte DOM
@@ -183,7 +183,7 @@
           title.textContent = mode === 'bitcount' ? `byte group ${idx}` : `binary group ${idx}`;
           byteEl.appendChild(row);
           byteEl.appendChild(title);
-          bitfield.appendChild(byteEl);
+          bitField.appendChild(byteEl);
         };
 
         // helper to draw a single KB group on canvas (128×64 pixels, 8192 bits)
@@ -225,7 +225,7 @@
           title.textContent = `KB ${idx}`;
           el.appendChild(canvas);
           el.appendChild(title);
-          bitfield.appendChild(el);
+          bitField.appendChild(el);
         };
 
         // helper to draw an MB block as a 32x32 canvas where each pixel represents a KB
@@ -272,7 +272,7 @@
           title.textContent = `MB ${idx}`;
           mbEl.appendChild(canvas);
           mbEl.appendChild(title);
-          bitfield.appendChild(mbEl);
+          bitField.appendChild(mbEl);
           // animate the canvas fade-in
           canvas.style.opacity = '0';
           setTimeout(() => { canvas.style.transition = 'opacity 280ms ease'; canvas.style.opacity = '1'; }, 12);
@@ -323,7 +323,7 @@
             title.textContent = mode === 'bitcount' ? `byte group ${idx}` : `binary group ${idx}`;
             byteEl.appendChild(row);
             byteEl.appendChild(title);
-            bitfield.appendChild(byteEl);
+            bitField.appendChild(byteEl);
           });
         }
 
@@ -337,7 +337,7 @@
           effectiveChunkSize = chunkSize;
         }
         if (totalCells >= CHUNK_CELL_THRESHOLD) {
-          bitfield.innerHTML = '';
+          bitField.innerHTML = '';
           let appended = 0;
           let chunkIdx = 0;
           const totalChunks = Math.ceil(totalItems / effectiveChunkSize);
@@ -362,17 +362,17 @@
             // for chunked append animate the newly added nodes
             if (useGrouping) {
               if (useMbLevel) {
-                const canvases = Array.from(bitfield.querySelectorAll('.mb-canvas')).slice(start, end);
+                const canvases = Array.from(bitField.querySelectorAll('.mb-canvas')).slice(start, end);
                 if (canvases.length) canvases.forEach(c => { c.style.opacity = '0'; setTimeout(() => c.style.opacity = '1', 6); });
               } else {
                 // KB-level canvas animations: fade in the freshly added canvases
-                const canvases = Array.from(bitfield.querySelectorAll('.kb-canvas')).slice(start, end);
+                const canvases = Array.from(bitField.querySelectorAll('.kb-canvas')).slice(start, end);
                 if (canvases.length) canvases.forEach(c => { c.style.opacity = '0'; setTimeout(() => c.style.opacity = '1', 6); });
               }
             } else {
               const sliceStart = start * 8;
               const sliceEnd = end * 8;
-              const sliceNodes = Array.from(bitfield.querySelectorAll('.bit, .cell')).slice(sliceStart, sliceEnd);
+              const sliceNodes = Array.from(bitField.querySelectorAll('.bit, .cell')).slice(sliceStart, sliceEnd);
               if (sliceNodes.length) animateNodesQuick(sliceNodes, 6, 2);
             }
 
@@ -380,8 +380,8 @@
               setTimeout(appendChunk, 12);
             } else {
               // finished
-              bitfield.dataset.rendered = 'true';
-              lastBits = Array.from(bitfield.querySelectorAll('.bit, .cell')).map(n => n.dataset.value || '0');
+              bitField.dataset.rendered = 'true';
+              lastBits = Array.from(bitField.querySelectorAll('.bit, .cell')).map(n => n.dataset.value || '0');
               if (loader) { loader.classList.add('hidden'); loader.setAttribute('aria-hidden', 'true'); }
             }
           };
@@ -391,7 +391,7 @@
         }
 
         // default non-chunked behavior
-        bitfield.dataset.rendered = 'true';
+        bitField.dataset.rendered = 'true';
         // animate initial state
         lastBits = newBitsFlat.split('');
         staggerUpdate(lastBits, {});
@@ -403,11 +403,11 @@
     // Decide how to schedule rendering
     if (totalCells >= CHUNK_CELL_THRESHOLD) {
       // if we already have the DOM and the flat bit length matches, this is an in-place update
-      if (bitfield.dataset.rendered && currentBitsFlat !== null && currentBitsFlat.length === newBitsFlat.length) {
+      if (bitField.dataset.rendered && currentBitsFlat !== null && currentBitsFlat.length === newBitsFlat.length) {
         // update element dataset values and animate differences
         const newBitsArr = newBitsFlat.split('');
-        const prevBitsArr = Array.from(bitfield.querySelectorAll('.bit, .cell')).map(b => b.dataset.value || '0');
-        const nodes = Array.from(bitfield.querySelectorAll('.bit, .cell'));
+        const prevBitsArr = Array.from(bitField.querySelectorAll('.bit, .cell')).map(b => b.dataset.value || '0');
+        const nodes = Array.from(bitField.querySelectorAll('.bit, .cell'));
         nodes.forEach((el, i) => { el.dataset.value = newBitsArr[i]; });
         staggerUpdate(newBitsArr, { prev: prevBitsArr });
         lastBits = newBitsArr.slice();
@@ -417,18 +417,18 @@
       // otherwise we need to rebuild using chunked rendering — show loader and start render
       if (loader) { loader.classList.remove('hidden'); loader.setAttribute('aria-hidden', 'false'); loader.querySelector('.loader-label').textContent = 'Rendering… 0%'; }
       // clear any prior rendered flag so renderDom will construct fresh
-      delete bitfield.dataset.rendered;
+      delete bitField.dataset.rendered;
       renderDom();
       return;
     }
 
     // if it's heavy but not chunked, try to update in-place when possible, otherwise rebuild
     if (bytes.length >= heavyThreshold) {
-      if (bitfield.dataset.rendered && currentBitsFlat !== null && currentBitsFlat.length === newBitsFlat.length) {
+      if (bitField.dataset.rendered && currentBitsFlat !== null && currentBitsFlat.length === newBitsFlat.length) {
         // same structure, just update values
         const newBitsArr = newBitsFlat.split('');
-        const prevBitsArr = Array.from(bitfield.querySelectorAll('.bit, .cell')).map(b => b.dataset.value || '0');
-        const nodes = Array.from(bitfield.querySelectorAll('.bit, .cell'));
+        const prevBitsArr = Array.from(bitField.querySelectorAll('.bit, .cell')).map(b => b.dataset.value || '0');
+        const nodes = Array.from(bitField.querySelectorAll('.bit, .cell'));
         nodes.forEach((el, i) => { el.dataset.value = newBitsArr[i]; });
         staggerUpdate(newBitsArr, { prev: prevBitsArr });
         lastBits = newBitsArr.slice();
@@ -437,13 +437,13 @@
 
       if (loader) { loader.classList.remove('hidden'); loader.setAttribute('aria-hidden', 'false'); }
       // clear any prior rendered flag so renderDom will construct fresh
-      delete bitfield.dataset.rendered;
+      delete bitField.dataset.rendered;
       setTimeout(renderDom, 30);
       return;
     }
 
     // if not heavy, render synchronously
-    if (!bitfield.dataset.rendered) {
+    if (!bitField.dataset.rendered) {
       renderDom();
       return;
     }
@@ -451,8 +451,8 @@
     // Compare existing bits and animate changes
     // If length differs, re-render structure for simplicity
     if (currentBitsFlat.length !== newBitsFlat.length) {
-      bitfield.innerHTML = '';
-      delete bitfield.dataset.rendered;
+      bitField.innerHTML = '';
+      delete bitField.dataset.rendered;
       // recursively call to re-render
       render(value);
       return;
@@ -460,10 +460,10 @@
 
     // otherwise animate differences
     const newBitsArr = newBitsFlat.split('');
-    const prevBitsArr = Array.from(bitfield.querySelectorAll('.bit, .cell')).map(b => b.dataset.value || '0');
+    const prevBitsArr = Array.from(bitField.querySelectorAll('.bit, .cell')).map(b => b.dataset.value || '0');
 
     // update element dataset values and animate on/off
-    const nodes = Array.from(bitfield.querySelectorAll('.bit, .cell'));
+    const nodes = Array.from(bitField.querySelectorAll('.bit, .cell'));
     nodes.forEach((el, i) => {
       el.dataset.value = newBitsArr[i];
     });
@@ -483,7 +483,7 @@
       if (loader) { loader.classList.add('hidden'); loader.setAttribute('aria-hidden', 'true'); }
       // provide some visual feedback in the loader label
       if (loader) {
-        const groupsRendered = bitfield.querySelectorAll('.byte, .kb-block, .mb-block').length;
+        const groupsRendered = bitField.querySelectorAll('.byte, .kb-block, .mb-block').length;
         loader.querySelector('.loader-label').textContent = `Render cancelled — ${groupsRendered.toLocaleString()} groups rendered`;
         // keep the message briefly visible, then hide loader
         setTimeout(() => { loader.classList.add('hidden'); loader.setAttribute('aria-hidden', 'true'); }, 900);
@@ -497,22 +497,22 @@
       const el = e.currentTarget;
       const step = BigInt(Number(el.getAttribute('data-step') || '1'));
       const action = el.getAttribute('data-action');
-      const current = parseNumber(bitInput.value || '0');
+      const current = parseNumber(numberInput.value || '0');
       let next = action === 'decrement' ? current - step : current + step;
       if (next < 0n) next = 0n;
-      bitInput.value = next.toString();
+      numberInput.value = next.toString();
       render(next);
     });
   });
 
   function staggerUpdate(newBits, { prev = [] } = {}) {
-    const nodes = Array.from(bitfield.querySelectorAll('.bit, .cell'));
+    const nodes = Array.from(bitField.querySelectorAll('.bit, .cell'));
     const currentByteGroups = Math.ceil(nodes.length / 8);
 
     // If we are showing many byte groups, disable per-bit staggered animations
     // and just apply classes directly for performance.
     if (currentByteGroups >= NO_ANIM_BYTE_GROUPS) {
-      bitfield.classList.add('no-anim');
+      bitField.classList.add('no-anim');
       nodes.forEach((el, i) => {
         const shouldOn = newBits[i] === '1';
         if (shouldOn) { el.classList.add('on'); el.classList.remove('off'); }
@@ -522,14 +522,14 @@
       return;
     }
     // otherwise ensure no-anim removed
-    bitfield.classList.remove('no-anim');
+    bitField.classList.remove('no-anim');
     const n = nodes.length || 1;
     // pick a total animation window (ms). For many nodes, keep this reasonable so per-bit delay is small.
     const totalWindow = 700; // ms
     const perBitDelay = Math.max(2, Math.floor(totalWindow / n));
     // animation duration for each dot transitions should be smaller when there are many nodes
     const bitTransitionMs = Math.max(40, Math.floor(350 * Math.min(1, 256 / n)));
-    bitfield.style.setProperty('--bit-transition', `${bitTransitionMs}ms`);
+    bitField.style.setProperty('--bit-transition', `${bitTransitionMs}ms`);
     // determine random-ish delays but stable order: light up left-to-right, top-to-bottom
     nodes.forEach((el, i) => {
       const shouldOn = newBits[i] === '1';
@@ -555,7 +555,7 @@
 
   // Animate a specific list of existing DOM bit nodes quickly (used for chunked rendering)
   function animateNodesQuick(bitEls, startDelay = 0, perDelay = 4) {
-    const quickNoAnim = Math.ceil(bitEls.length / 8) >= NO_ANIM_BYTE_GROUPS || bitfield.classList.contains('no-anim');
+    const quickNoAnim = Math.ceil(bitEls.length / 8) >= NO_ANIM_BYTE_GROUPS || bitField.classList.contains('no-anim');
     bitEls.forEach((el, i) => {
       const shouldOn = (el.dataset.value || '0') === '1';
       if (quickNoAnim) {
@@ -588,25 +588,25 @@
     }
     const totalWidth = byteCount * byteWidth;
 
-    bitfield.classList.remove('small', 'smaller', 'tiny', 'tinier', 'scaled');
+    bitField.classList.remove('small', 'smaller', 'tiny', 'tinier', 'scaled');
 
     // We need to scale the circles to fit the available width. Compute a scale factor.
     // Keep a margin so things don't touch the edges.
     const scale = Math.max(0.2, Math.min(1, (containerW * 0.85) / totalWidth));
     const newCircle = Math.max(6, Math.floor(circle * scale));
-    bitfield.style.setProperty('--circle-size', `${newCircle}px`);
-    bitfield.classList.add('scaled');
+    bitField.style.setProperty('--circle-size', `${newCircle}px`);
+    bitField.classList.add('scaled');
     // Also shrink a bit when very crowded
-    if (byteCount > 32) bitfield.classList.add('small');
-    if (byteCount > 64) bitfield.classList.add('smaller');
+    if (byteCount > 32) bitField.classList.add('small');
+    if (byteCount > 64) bitField.classList.add('smaller');
   }
 
   // throttle input handling slightly
   let timeoutId = null;
-  bitInput.addEventListener('input', () => {
+  numberInput.addEventListener('input', () => {
     if (timeoutId) clearTimeout(timeoutId);
     timeoutId = setTimeout(() => {
-      const n = parseNumber(bitInput.value);
+      const n = parseNumber(numberInput.value);
       render(n);
     }, 140);
   });
@@ -616,7 +616,7 @@
   // - Shift + Arrow -> change by 10
   // - Ctrl  + Arrow -> change by 100
   // - Alt   + Arrow -> change by 1000
-  bitInput.addEventListener('keydown', (e) => {
+  numberInput.addEventListener('keydown', (e) => {
     if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
     // stop native cursor movement / selection changes
     e.preventDefault();
@@ -625,10 +625,10 @@
     const step = e.altKey ? 1000n : (e.ctrlKey ? 100n : (e.shiftKey ? 10n : 1n));
     const dir = e.key === 'ArrowUp' ? 1n : -1n;
 
-    const current = parseNumber(bitInput.value || '0');
+    const current = parseNumber(numberInput.value || '0');
     let next = current + (step * dir);
     if (next < 0n) next = 0n;
-    bitInput.value = next.toString();
+    numberInput.value = next.toString();
     render(next);
   });
 
@@ -638,11 +638,11 @@
       mode = e.target.value;
       if (inputLabel) {
         inputLabel.textContent = mode === 'bitcount' ? 'Enter bit count' : 'Enter integer';
-        bitInput.value = '255';
-        bitInput.focus();
+        numberInput.value = '255';
+        numberInput.focus();
       }
       // re-render with the new input interpretation
-      const n = parseNumber(bitInput.value);
+      const n = parseNumber(numberInput.value);
       render(n);
     });
   }
@@ -651,8 +651,8 @@
   render(0n);
 
   // make field accept big numbers via ctrl+v paste
-  bitInput.addEventListener('paste', (e) => {
+  numberInput.addEventListener('paste', (e) => {
     // allow paste
-    setTimeout(() => { bitInput.dispatchEvent(new Event('input')); }, 1);
+    setTimeout(() => { numberInput.dispatchEvent(new Event('input')); }, 1);
   });
 })();
