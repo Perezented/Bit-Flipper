@@ -265,6 +265,7 @@ main {
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(0, 0, 0, 0.8);
   image-rendering: pixelated; /* crisp pixel rendering for tiny canvas */
+  transition: opacity 280ms ease;
 }
 
 /* Keep .kb-grid styles for backwards compatibility, but they're no longer used */
@@ -311,21 +312,16 @@ main {
   min-width: fit-content
 }
 
-.mb-block .mb-grid {
-  display: grid;
-  grid-template-columns: repeat(16, 1fr);
-  gap: 3px;
+.mb-block .mb-canvas {
+  display: block;
   width: 220px;
-  height: 110px
-}
-
-.mb-block .mb-grid .tile {
-  width: 100%;
-  height: 100%;
+  height: 220px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.03);
-  transition: background 200ms linear
+  background: rgba(0, 0, 0, 0.8);
+  image-rendering: pixelated;
+  opacity: 0; /* start hidden then fade in via JS */
+  transition: opacity 280ms ease;
 }
 
 .mb-block .mb-title {

@@ -258,35 +258,54 @@
           bitfield.appendChild(el);
         };
 
+        // helper to draw an MB block as a 32x32 canvas where each pixel represents a KB
+        const drawMbBlock = (canvas, mbArray) => {
+          const cols = 32;
+          const rows = 32; // 32*32 = 1024 KB tiles per MB
+          const ctx = canvas.getContext('2d');
+          canvas.width = cols;
+          canvas.height = rows;
+          // clear and paint background
+          ctx.fillStyle = 'rgba(0,0,0,1)';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          // draw each KB entry as one pixel
+          for (let i = 0; i < Math.min(mbArray.length, cols * rows); i++) {
+            const v = mbArray[i];
+            let frac = 0;
+            if (typeof v === 'string') {
+              const ones = (v.match(/1/g) || []).length;
+              frac = ones / BITS_PER_GROUP;
+            } else if (typeof v === 'number') {
+              frac = v;
+            }
+            if (frac > 0) {
+              const alpha = 0.04 + frac * 0.9;
+              ctx.fillStyle = `rgba(0,255,120,${alpha})`;
+              const row = Math.floor(i / cols);
+              const col = i % cols;
+              ctx.fillRect(col, row, 1, 1);
+            }
+          }
+        };
+
         // helper to append an MB group DOM (collection of GROUPS_PER_LEVEL KB tiles)
-        // mbArray can be an array of KB bit-strings or an array of per-KB fractions (numbers 0..1)
         const appendMb = (mbArray, idx) => {
           const mbEl = document.createElement('div');
           mbEl.className = 'mb-block';
           mbEl.dataset.mbIndex = idx;
-          const mbGrid = document.createElement('div');
-          mbGrid.className = 'mb-grid';
-          mbArray.forEach((kbBits) => {
-            const tile = document.createElement('div');
-            tile.className = 'tile';
-            let frac = 0;
-            if (typeof kbBits === 'string') {
-              const ones = (kbBits.match(/1/g) || []).length;
-              frac = ones / BITS_PER_GROUP;
-            } else if (typeof kbBits === 'number') {
-              frac = kbBits;
-            }
-            tile.style.background = `rgba(0,255,120,${0.04 + frac * 0.9})`;
-            tile.dataset.value = frac > 0 ? '1' : '0';
-            if (frac > 0.01) tile.classList.add('on');
-            mbGrid.appendChild(tile);
-          });
+          const canvas = document.createElement('canvas');
+          canvas.className = 'mb-canvas';
+          canvas.dataset.mbIndex = idx;
+          drawMbBlock(canvas, mbArray);
           const title = document.createElement('div');
           title.className = 'mb-title';
           title.textContent = `MB ${idx}`;
-          mbEl.appendChild(mbGrid);
+          mbEl.appendChild(canvas);
           mbEl.appendChild(title);
           bitfield.appendChild(mbEl);
+          // animate the canvas fade-in
+          canvas.style.opacity = '0';
+          setTimeout(() => { canvas.style.transition = 'opacity 280ms ease'; canvas.style.opacity = '1'; }, 12);
         };
 
         if (useGrouping) {
@@ -373,11 +392,12 @@
             // for chunked append animate the newly added nodes
             if (useGrouping) {
               if (useMbLevel) {
-                const sliceNodes = Array.from(bitfield.querySelectorAll('.mb-block')).slice(start, end).flatMap(b => Array.from(b.querySelectorAll('.tile')));
-                if (sliceNodes.length) animateNodesQuick(sliceNodes, 6, 2);
+                const canvases = Array.from(bitfield.querySelectorAll('.mb-canvas')).slice(start, end);
+                if (canvases.length) canvases.forEach(c => { c.style.opacity = '0'; setTimeout(() => c.style.opacity = '1', 6); });
               } else {
-                const sliceNodes = Array.from(bitfield.querySelectorAll('.kb-block')).slice(start, end).flatMap(b => Array.from(b.querySelectorAll('.cell')));
-                if (sliceNodes.length) animateNodesQuick(sliceNodes, 6, 2);
+                // KB-level canvas animations: fade in the freshly added canvases
+                const canvases = Array.from(bitfield.querySelectorAll('.kb-canvas')).slice(start, end);
+                if (canvases.length) canvases.forEach(c => { c.style.opacity = '0'; setTimeout(() => c.style.opacity = '1', 6); });
               }
             } else {
               const sliceStart = start * 8;

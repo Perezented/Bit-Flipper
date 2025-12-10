@@ -28,11 +28,11 @@ test.describe('Bit Flipper basic UI', () => {
     await expect(loader).toBeHidden({ timeout: 120000 });
     const kbs = page.locator('.kb-block');
     await expect(kbs).toHaveCount(62, { timeout: 120000 });
-    
+
     // Verify that each KB block contains a canvas element (not a grid of cells)
     const canvases = page.locator('.kb-canvas');
     await expect(canvases).toHaveCount(62, { timeout: 5000 });
-    
+
     // Verify canvas dimensions: 128×64 pixels (1 pixel per bit)
     const firstCanvas = canvases.first();
     const canvasWidth = await firstCanvas.evaluate(el => (el as HTMLCanvasElement).width);
@@ -71,5 +71,25 @@ test.describe('Bit Flipper basic UI', () => {
     await page.keyboard.press('ArrowUp');
     await page.keyboard.up('Alt');
     await expect(input).toHaveValue('1111');
+  });
+
+  test('MB-level canvas renders for large inputs', async ({ page }) => {
+    await page.goto('/');
+    await page.selectOption('#mode', 'bitcount');
+    const input = page.locator('#number-input');
+    // 2 MB -> 2 * (8192 bits * 1024 KB) = 16777216 bits
+    await input.fill('16777216');
+    const loader = page.locator('#loader');
+    await expect(loader).toBeVisible({ timeout: 5000 });
+    await expect(loader).toBeHidden({ timeout: 120000 });
+    const mbs = page.locator('.mb-block');
+    await expect(mbs).toHaveCount(2, { timeout: 120000 });
+    const canvases = page.locator('.mb-canvas');
+    await expect(canvases).toHaveCount(2, { timeout: 5000 });
+    const first = canvases.first();
+    const w = await first.evaluate(el => (el as HTMLCanvasElement).width);
+    const h = await first.evaluate(el => (el as HTMLCanvasElement).height);
+    expect(w).toBe(32);
+    expect(h).toBe(32);
   });
 });
