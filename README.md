@@ -3,7 +3,7 @@
 Tiny Python web app showing numbers as binary bits grouped into 8-bit bytes with neon styling and animations.
 
 Modes
-- Bit count → bytes (default): interpret the input as a number of bits and convert to bytes (floor(bits / 8)). Example: "1024" (bits) becomes 128 bytes — 128 byte-grids all fully lit.
+- Bits and bytes (default): interpret the input as a number of bits and convert to bytes (floor(bits / 8)). Example: "1024" (bits) becomes 128 bytes — 128 byte-grids all fully lit.
 - Binary: interpret the input as a regular integer and render its canonical binary grouped into 8-bit bytes. Example: "1024" (value) becomes two bytes: 0x04 0x00.
 
 E2E tests (Playwright)

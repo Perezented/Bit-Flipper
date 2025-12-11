@@ -253,13 +253,13 @@ main {
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.03);
   background: linear-gradient(0deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.006));
-  min-width: fit-content
+  min-width: 160px; /* ensure KB tiles can be tiled horizontally */
 }
 
 /* Canvas-based KB rendering (replaces the old grid approach) */
 .kb-block .kb-canvas {
   display: block;
-  width: min(92vw, 900px);
+  width: 180px; /* smaller canvas so multiple KB tiles fit per row */
   height: auto; /* maintain aspect ratio */
   border-radius: 4px;
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -276,8 +276,8 @@ main {
   grid-auto-rows: 1fr;
   gap: 1px;
   /* tighter spacing to keep KB block compact */
-  width: min(92vw, 900px);
-  height: calc(min(92vw, 900px) / 2);
+  width: 180px;
+  height: calc(180px / 2);
 }
 
 .kb-block .kb-grid .cell {

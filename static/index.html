@@ -23,8 +23,19 @@
                         <div class="mode-select">
                             <label for="mode">Mode</label>
                             <select id="mode" aria-label="View mode">
-                                <option value="bitcount">Bit count → bytes</option>
+                                <option value="bitcount">Bits and bytes</option>
                                 <option value="binary" selected>Binary</option>
+                            </select>
+                        </div>
+                        <div class="mode-select unit-select">
+                            <label for="unit-select">Unit</label>
+                            <select id="unit-select" aria-label="Count unit">
+                                <option value="bits">Bits</option>
+                                <option value="bytes">Bytes</option>
+                                <option value="KB">KB</option>
+                                <option value="MB">MB</option>
+                                <option value="GB">GB</option>
+                                <option value="TB">TB</option>
                             </select>
                         </div>
                     </div>
@@ -115,7 +126,7 @@
             <footer>
                 <details class="keyboard-help" style="display:inline-block; margin-left:0.5rem;">
                     <summary class="help-summary" title="Show keyboard shortcut help" style="cursor:pointer">
-                        Keyboard controls ▾
+                        Keyboard controls
                     </summary>
                     <pre id="keyboard-help" class="help-content"
                         style="white-space:pre-wrap; margin:0.5rem 0 0; padding:0.5rem; background:#111; color:#dff; border-radius:6px;">
