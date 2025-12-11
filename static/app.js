@@ -36,6 +36,47 @@
     while (b >= 1024 && i < units.length - 1) { b /= 1024; i++; }
     return `${b % 1 === 0 ? b.toFixed(0) : b.toFixed(2)} ${units[i]}`;
   }
+    // Humanize bytes with BigInt support — if very large, fall back to larger units.
+    function humanizeBytes(bytes) {
+      const units = ['bytes', 'KB', 'MB', 'GB', 'TB'];
+      // Accept BigInt or Number
+      if (typeof bytes === 'bigint') {
+        let b = bytes;
+        let i = 0;
+        while (b >= 1024n && i < units.length - 1) { b = b / 1024n; i++; }
+        // For very large numbers, just show the integer part
+        if (b > 900n) return `${String(b)} ${units[i]}`;
+        // Otherwise convert to Number to allow decimals
+        const bn = Number(bytes);
+        let dd = bn;
+        let j = 0;
+        while (dd >= 1024 && j < units.length - 1) { dd /= 1024; j++; }
+        return `${dd % 1 === 0 ? dd.toFixed(0) : dd.toFixed(2)} ${units[j]}`;
+      }
+      // fallback for numbers
+      const unitsN = ['bytes', 'KB', 'MB', 'GB', 'TB'];
+      let bN = Number(bytes);
+      let iN = 0;
+      while (bN >= 1024 && iN < unitsN.length - 1) { bN /= 1024; iN++; }
+      return `${bN % 1 === 0 ? bN.toFixed(0) : bN.toFixed(2)} ${unitsN[iN]}`;
+    }
+
+    // Precompute useful group counts and fractions without materializing full bit arrays.
+    function computeGroupCountsForBitcount(totalBitsBig) {
+      const totalBits = BigInt(totalBitsBig);
+      const totalBytes = totalBits / 8n;
+      const groupCount = Number((totalBits + BigInt(BITS_PER_GROUP) - 1n) / BigInt(BITS_PER_GROUP));
+      // For each KB group we can compute number of ones quickly without creating strings.
+      const kbFractions = [];
+      const maxIter = 8192 * 1024; // sanity cap — not usually reached; kept as a guard, but not used.
+      for (let gi = 0; gi < groupCount; gi++) {
+        const start = BigInt(gi) * BigInt(BITS_PER_GROUP);
+        const end = start + BigInt(BITS_PER_GROUP);
+        const ones = start >= totalBits ? 0n : (end <= totalBits ? BigInt(BITS_PER_GROUP) : (totalBits - start));
+        kbFractions.push(Number(ones) / BITS_PER_GROUP);
+      }
+      return { totalBits, totalBytes, groupCount, kbFractions };
+    }
 
   // Grouping constants (bytes)
   // We treat a "KB block" here as 1024 bytes (8192 bits).
@@ -54,6 +95,10 @@
     if (el) el.textContent = now === START ? String(START) : `${START} - ${now}`;
     // (render-level constants moved to top for consistency)
 
+    // Hoist these variables so they can be used outside the bitcount block
+    let groupCount = 0;
+    let totalBitsBI = 0n;
+
     if (mode === 'bitcount') {
       // interpret `value` as a bit count
       const totalBits = BigInt(value);
@@ -61,15 +106,25 @@
       const remainder = Number(totalBits % 8n);
       bytesCountForUnit = fullBytes;
 
-      // full bytes -> fully lit (0xFF)
-      for (let i = 0n; i < fullBytes; i++) bytes.push(Array(8).fill('1'));
-      // partial final byte (fill MSB side for a nicer visual fill)
-      if (remainder > 0) {
-        const partial = Array(8).fill('0');
-        for (let i = 0; i < remainder; i++) partial[i] = '1';
-        bytes.push(partial);
+      // If we are in the grouped case, avoid creating many full arrays of bits
+      // — instead compute group counts/fractions and lazily build data only for canvases we'll render.
+      const useGrouping = fullBytes >= BigInt(GROUP_BYTES);
+      if (!useGrouping) {
+        // small: build per-byte arrays as before
+        for (let i = 0n; i < fullBytes; i++) bytes.push(Array(8).fill('1'));
+        if (remainder > 0) {
+          const partial = Array(8).fill('0');
+          for (let i = 0; i < remainder; i++) partial[i] = '1';
+          bytes.push(partial);
+        }
+        if (bytes.length === 0) bytes.push(Array(8).fill('0'));
+      } else {
+        // large: do not create per-byte arrays — compute just the counts needed
+        // We'll set bytes to be an array of empty placeholders for sizing only.
+        const totalBytesNumber = Number(fullBytes > 9_000_000_000n ? 9_000_000_000 : fullBytes); // cap for Number conversion
+        // create lightweight placeholders to satisfy display sizing; values not used for drawing when grouped
+        bytes = new Array(0);
       }
-      if (bytes.length === 0) bytes.push(Array(8).fill('0'));
     } else {
       // binary mode: interpret value as an integer and show its binary groups (MSB-first)
       const n = BigInt(value);
@@ -94,58 +149,84 @@
     // compute and set sizing classes after grouping decision below (moved)
 
     // now build or update DOM
-    const newBitsFlat = bytes.flat().join('');
+    const newBitsFlat = bytes.length ? bytes.flat().join('') : '';
     // determine grouping for bitcount mode: if there are many bytes, show KB blocks
-    const useGrouping = mode === 'bitcount' && bytes.length >= GROUP_BYTES;
+    const useGrouping = mode === 'bitcount' && bytesCountForUnit >= BigInt(GROUP_BYTES);
     // when grouping, build KB groups (each is BITS_PER_GROUP bits, now 8192 bits)
-    let kbGroups = null; // array of strings (each length BITS_PER_GROUP)
-    if (useGrouping) {
-      kbGroups = [];
-      const totalBits = newBitsFlat.length;
-      const groupCount = Math.ceil(totalBits / BITS_PER_GROUP);
-      for (let gi = 0; gi < groupCount; gi++) {
-        const start = gi * BITS_PER_GROUP;
-        const chunk = newBitsFlat.slice(start, start + BITS_PER_GROUP);
-        // pad chunk to full length for consistent UI
-        kbGroups.push(chunk.padEnd(BITS_PER_GROUP, '0'));
+    // when grouping, compute KB groups and fractions without allocating massive arrays
+    let kbGroups = null; // array of strings (each length BITS_PER_GROUP) or null when lazily computed
+    let kbFractions = null; // per-KB fractions numbers we can use for MB overview.
+    if (mode === 'bitcount' && bytesCountForUnit >= BigInt(GROUP_BYTES)) {
+      // compute total bits and counts without building the entire bit string
+      totalBitsBI = BigInt(bytesCountForUnit) * 8n;
+      const totalBitsNumber = Number(totalBitsBI > 9_000_000_000n ? 9_000_000_000 : totalBitsBI);
+      groupCount = Math.ceil(Number(totalBitsBI) / BITS_PER_GROUP);
+      // precompute per-KB fractions but only when not astronomically huge; cap at a reasonable length
+      if (groupCount <= 32768) {
+        kbFractions = [];
+        for (let gi = 0; gi < groupCount; gi++) {
+          const start = BigInt(gi) * BigInt(BITS_PER_GROUP);
+          const end = start + BigInt(BITS_PER_GROUP);
+          const ones = start >= totalBitsBI ? 0n : (end <= totalBitsBI ? BigInt(BITS_PER_GROUP) : (totalBitsBI - start));
+          kbFractions.push(Number(ones) / BITS_PER_GROUP);
+        }
       }
       // determine whether we should render at MB level (groups of GROUPS_PER_LEVEL KBs)
-      var useMbLevel = kbGroups.length >= GROUPS_PER_LEVEL;
+      var useMbLevel = groupCount >= GROUPS_PER_LEVEL;
       var mbGroups = null;
 
       // If the server can help compute summaries for very large inputs (and we
       // are rendering MB-level summaries), fetch the per-KB fraction summary
       // as an optional performance optimization. The server endpoint returns
       // an array of fractions (0..1) indicating how many bits are set in each
-      // KB group for the bitcount mode.
-      async function tryServerSummary() {
-        try {
-          const res = await fetch('/api/group_summary', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ value: String(totalBits), mode: 'bitcount' })
-          });
-          if (!res.ok) return null;
-          const body = await res.json();
-          if (body && Array.isArray(body.kb_fractions)) return body.kb_fractions;
-        } catch (e) { /* ignore and fallback */ }
-        return null;
-      }
+      // KB group for the bitcount mode. We use the parameterized version
+      // defined further down to keep a single definition.
       if (useMbLevel) {
         mbGroups = [];
-        for (let i = 0; i < kbGroups.length; i += GROUPS_PER_LEVEL) mbGroups.push(kbGroups.slice(i, i + GROUPS_PER_LEVEL));
+        if (kbFractions && kbFractions.length) {
+          for (let i = 0; i < kbFractions.length; i += GROUPS_PER_LEVEL) mbGroups.push(kbFractions.slice(i, i + GROUPS_PER_LEVEL));
+        }
+      }
+      // proactively ask server for per-KB fractions for large inputs. This is optional and
+      // used to avoid generating long per-KB strings on the client.
+      if (useMbLevel && !kbFractions) {
+        const tb = Number(totalBitsBI > 9_000_000_000n ? 9_000_000_000n : totalBitsBI);
+        tryServerSummary(tb).then((srv) => {
+          if (srv && srv.length) kbFractions = srv;
+        }).catch(() => {});
       }
     }
 
+    // helper to fetch server-side per-KB summaries for large datasets
+    async function tryServerSummary(totalBits) {
+      try {
+        const res = await fetch('/api/group_summary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: String(totalBits), mode: 'bitcount' })
+        });
+        if (!res.ok) return null;
+        const body = await res.json();
+        if (body && Array.isArray(body.kb_fractions)) return body.kb_fractions;
+      } catch (e) { /* ignore and fallback */ }
+      return null;
+    }
+
     // compute display count and sizing after grouping info is available
-    const displayCount = useGrouping ? (useMbLevel ? mbGroups.length : kbGroups.length) : bytes.length;
+    let displayCount = 0;
+    if (!useGrouping) displayCount = bytes.length;
+    else if (useMbLevel) displayCount = (mbGroups && mbGroups.length) ? mbGroups.length : Math.ceil((kbFractions ? kbFractions.length : groupCount) / GROUPS_PER_LEVEL);
+    else displayCount = kbFractions ? kbFractions.length : groupCount;
     adjustSizing(displayCount, useGrouping);
     // if we already rendered something, capture the current bit string so we can
     // decide whether a full rebuild is needed (length differs) or we can update in-place
     const currentBitsFlat = bitField.dataset.rendered ? Array.from(bitField.querySelectorAll('.bit, .cell')).map(b => b.dataset.value || '0').join('') : null;
     // If we're grouping, we'll render groups (kbGroups) instead of individual bytes
     // if we're asked to render many items (bytes or groups), show a loader and render asynchronously
-    const totalCells = bytes.length * 8;
+    // totalCells used to determine heavy / chunking: number of bits being represented
+    let totalCells;
+    if (!useGrouping) totalCells = bytes.length * 8;
+    else totalCells = (kbFractions ? kbFractions.length : groupCount) * BITS_PER_GROUP;
     const loader = document.getElementById('loader');
     const heavyThreshold = 180; // number of byte groups considered heavy to render
     // chunkedThreshold & chunkSize are defined at top-level
@@ -186,40 +267,83 @@
           bitField.appendChild(byteEl);
         };
 
-        // helper to draw a single KB group on canvas (128×64 pixels, 8192 bits)
-        // canvas is much more efficient than 8192 DOM elements
-        const drawKbBlock = (canvas, chunkBits) => {
+      // helper to draw a single KB group on canvas (128×64 pixels, 8192 bits)
+      // Use ImageData (faster) for per-pixel drawing. If chunkBits is a number (fraction) we draw a single color fill
+      const drawKbBlock = (canvas, chunkBitsOrFrac, animate = false) => {
           const cols = 128;
           const rows = 64;
           const pixelSize = 1; // 1 pixel per bit
           const ctx = canvas.getContext('2d');
           canvas.width = cols * pixelSize;
           canvas.height = rows * pixelSize;
-
-          // fill background
+          // clear background
           ctx.fillStyle = 'rgba(0,0,0,1)';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-          // draw bits as pixels
-          ctx.fillStyle = '#00ff99'; // neon green, matching --fg
+          if (typeof chunkBitsOrFrac === 'number') {
+            const frac = Math.max(0, Math.min(1, chunkBitsOrFrac));
+            if (frac <= 0) return;
+            const alpha = 0.04 + frac * 0.9;
+            ctx.fillStyle = `rgba(0,255,120,${alpha})`;
+            if (!animate) {
+              ctx.fillRect(0, 0, cols * pixelSize, rows * pixelSize);
+            } else {
+              // animate fill across rows
+              let rstart = 0;
+              const tile = 8;
+              const step = () => {
+                const h = Math.min(tile, rows - rstart);
+                ctx.fillRect(0, rstart, cols * pixelSize, h * pixelSize);
+                rstart += tile;
+                if (rstart < rows) requestAnimationFrame(step);
+              };
+              requestAnimationFrame(step);
+            }
+            return;
+          }
+
+          const chunkBits = chunkBitsOrFrac;
+          // bit-by-bit building of ImageData for the whole KB
+          const id = ctx.createImageData(cols, rows);
+          const data = id.data; // Uint8ClampedArray
+          // precomputed color
+          const r = 0, g = 255, bcol = 153, a = 255;
           for (let i = 0; i < BITS_PER_GROUP; i++) {
             if (chunkBits[i] === '1') {
               const row = Math.floor(i / cols);
               const col = i % cols;
-              ctx.fillRect(col * pixelSize, row * pixelSize, pixelSize, pixelSize);
+              const pidx = (row * cols + col) * 4;
+              data[pidx] = r;
+              data[pidx + 1] = g;
+              data[pidx + 2] = bcol;
+              data[pidx + 3] = a;
             }
+          }
+          if (!animate) {
+            ctx.putImageData(id, 0, 0);
+          } else {
+            // Reveal the KB canvas in row-chunks to give a granular build-up.
+            const tile = 8; // rows per animation step
+            let rowStart = 0;
+            const step = () => {
+              const h = Math.min(tile, rows - rowStart);
+              ctx.putImageData(id, 0, 0, 0, rowStart, cols, h);
+              rowStart += tile;
+              if (rowStart < rows) requestAnimationFrame(step);
+            };
+            requestAnimationFrame(step);
           }
         };
 
         // helper to append a single KB group as a canvas element
-        const appendKb = (chunkBits, idx) => {
+        const appendKb = (chunkBitsOrFrac, idx, animate = false) => {
           const el = document.createElement('div');
           el.className = 'kb-block';
           el.dataset.kbIndex = idx;
           const canvas = document.createElement('canvas');
           canvas.className = 'kb-canvas';
           canvas.dataset.kbIndex = idx;
-          drawKbBlock(canvas, chunkBits);
+          drawKbBlock(canvas, chunkBitsOrFrac, animate);
           const title = document.createElement('div');
           title.className = 'kb-title';
           title.textContent = `KB ${idx}`;
@@ -243,7 +367,9 @@
             const v = mbArray[i];
             let frac = 0;
             if (typeof v === 'string') {
-              const ones = (v.match(/1/g) || []).length;
+              // if strings are present, compute ones more efficiently with a loop rather than regex
+              let ones = 0;
+              for (let j = 0; j < v.length; j++) if (v[j] === '1') ones++;
               frac = ones / BITS_PER_GROUP;
             } else if (typeof v === 'number') {
               frac = v;
@@ -278,28 +404,69 @@
           setTimeout(() => { canvas.style.transition = 'opacity 280ms ease'; canvas.style.opacity = '1'; }, 12);
         };
 
+        // Try server summary fetch separately — this helper only makes the network call
+
         if (useGrouping) {
           // determine MB-level grouping (each MB = GROUPS_PER_LEVEL KB groups)
-          const useMbLevel = kbGroups.length >= GROUPS_PER_LEVEL;
+          const groupCount = (kbFractions && kbFractions.length) ? kbFractions.length : Math.ceil((Number((BigInt(bytesCountForUnit) * 8n) > 9_000_000_000n ? 9_000_000_000 : Number(bytesCountForUnit) * 8) || 0) / BITS_PER_GROUP);
+          const useMbLevel = groupCount >= GROUPS_PER_LEVEL;
           if (!useMbLevel) {
             // append KB groups directly when not chunking
-            if (totalCells < CHUNK_CELL_THRESHOLD) kbGroups.forEach((b, idx) => appendKb(b, idx));
+            if (totalCells < CHUNK_CELL_THRESHOLD) {
+              for (let i = 0; i < groupCount; i++) {
+                if (kbFractions) appendKb(kbFractions[i], i, true);
+                else {
+                  const start = BigInt(i) * BigInt(BITS_PER_GROUP);
+                  const end = start + BigInt(BITS_PER_GROUP);
+                  const ones = start >= totalBitsBI ? 0n : (end <= totalBitsBI ? BigInt(BITS_PER_GROUP) : (totalBitsBI - start));
+                  const frac = Number(ones) / BITS_PER_GROUP;
+                  appendKb(frac, i, true);
+                }
+              }
+            }
           } else {
             // build MB groups (each MB contains up to GROUPS_PER_LEVEL KB groups)
             const mbGroups = [];
-            for (let i = 0; i < kbGroups.length; i += GROUPS_PER_LEVEL) mbGroups.push(kbGroups.slice(i, i + GROUPS_PER_LEVEL));
-            if (totalCells < CHUNK_CELL_THRESHOLD) {
-              // Try to use server-side per-KB fractions to drive MB tiles;
-              // fall back to the detailed MB groups if none available.
-              tryServerSummary().then((kbFractions) => {
-                if (kbFractions && kbFractions.length === kbGroups.length) {
-                  const mbFracs = [];
-                  for (let i = 0; i < kbFractions.length; i += GROUPS_PER_LEVEL) mbFracs.push(kbFractions.slice(i, i + GROUPS_PER_LEVEL));
-                  mbFracs.forEach((mbf, mIdx) => appendMb(mbf, mIdx));
-                } else {
+            if (kbFractions) {
+              for (let i = 0; i < kbFractions.length; i += GROUPS_PER_LEVEL) mbGroups.push(kbFractions.slice(i, i + GROUPS_PER_LEVEL));
+            } else {
+              // try server summary; otherwise fallback to building per-KB strings (only done for small datasets)
+              // we compute a best-effort totalBits number for the server
+              const totalBits = Number(BigInt(bytesCountForUnit) * 8n > 9_000_000_000n ? 9_000_000_000n : BigInt(bytesCountForUnit) * 8n);
+              tryServerSummary(totalBits).then((srvKb) => {
+                if (srvKb && srvKb.length) {
+                  for (let i = 0; i < srvKb.length; i += GROUPS_PER_LEVEL) mbGroups.push(srvKb.slice(i, i + GROUPS_PER_LEVEL));
+                  if (totalCells < CHUNK_CELL_THRESHOLD) mbGroups.forEach((mbf, mIdx) => appendMb(mbf, mIdx));
+                } else if (totalCells < CHUNK_CELL_THRESHOLD) {
+                  for (let i = 0; i < groupCount; i += GROUPS_PER_LEVEL) {
+                    const start = i;
+                    const sub = [];
+                    for (let j = start; j < Math.min(groupCount, start + GROUPS_PER_LEVEL); j++) {
+                      const s = BigInt(j) * BigInt(BITS_PER_GROUP);
+                      const e = s + BigInt(BITS_PER_GROUP);
+                      const ones = s >= totalBitsBI ? 0n : (e <= totalBitsBI ? BigInt(BITS_PER_GROUP) : (totalBitsBI - s));
+                      sub.push(Number(ones) / BITS_PER_GROUP);
+                    }
+                    mbGroups.push(sub);
+                  }
                   mbGroups.forEach((mb, mIdx) => appendMb(mb, mIdx));
                 }
-              }).catch(() => { mbGroups.forEach((mb, mIdx) => appendMb(mb, mIdx)); });
+              }).catch(() => {
+                if (totalCells < CHUNK_CELL_THRESHOLD) {
+                  for (let i = 0; i < groupCount; i += GROUPS_PER_LEVEL) {
+                    const start = i;
+                    const sub = [];
+                    for (let j = start; j < Math.min(groupCount, start + GROUPS_PER_LEVEL); j++) {
+                      const s = BigInt(j) * BigInt(BITS_PER_GROUP);
+                      const e = s + BigInt(BITS_PER_GROUP);
+                      const ones = s >= totalBitsBI ? 0n : (e <= totalBitsBI ? BigInt(BITS_PER_GROUP) : (totalBitsBI - s));
+                      sub.push(Number(ones) / BITS_PER_GROUP);
+                    }
+                    mbGroups.push(sub);
+                  }
+                  mbGroups.forEach((mb, mIdx) => appendMb(mb, mIdx));
+                }
+              });
             }
           }
         } else if (totalCells < CHUNK_CELL_THRESHOLD) {
@@ -330,7 +497,14 @@
         // chunked rendering for very large counts / groups
         // decide effective chunk size depending on grouping and level
         let effectiveChunkSize;
-        const totalItems = useGrouping ? (useMbLevel ? mbGroups.length : kbGroups.length) : bytes.length;
+        let totalItems;
+        if (!useGrouping) {
+          totalItems = bytes.length;
+        } else if (useMbLevel) {
+          totalItems = (typeof mbGroups !== 'undefined' && mbGroups && mbGroups.length) ? mbGroups.length : Math.ceil(groupCount / GROUPS_PER_LEVEL);
+        } else {
+          totalItems = (kbFractions && kbFractions.length) ? kbFractions.length : groupCount;
+        }
         if (useGrouping) {
           effectiveChunkSize = useMbLevel ? 2 : 8; // add only a few KBs or MBs per chunk
         } else {
@@ -348,8 +522,32 @@
             const end = Math.min(totalItems, start + effectiveChunkSize);
             for (let idx = start; idx < end; idx++) {
               if (useGrouping) {
-                if (useMbLevel) appendMb(mbGroups[idx], idx);
-                else appendKb(kbGroups[idx], idx);
+                if (useMbLevel) {
+                  if (mbGroups && mbGroups[idx]) appendMb(mbGroups[idx], idx);
+                  else {
+                    // need to build on-demand
+                    const baseIdx = idx * GROUPS_PER_LEVEL;
+                    const arr = [];
+                    for (let j = baseIdx; j < Math.min(groupCount, baseIdx + GROUPS_PER_LEVEL); j++) {
+                      if (kbFractions) arr.push(kbFractions[j]);
+                      else {
+                        const s = BigInt(j) * BigInt(BITS_PER_GROUP);
+                        const e = s + BigInt(BITS_PER_GROUP);
+                        const ones = s >= totalBitsBI ? 0n : (e <= totalBitsBI ? BigInt(BITS_PER_GROUP) : (totalBitsBI - s));
+                        arr.push(Number(ones) / BITS_PER_GROUP);
+                      }
+                    }
+                    appendMb(arr, idx);
+                  }
+                } else {
+                  if (kbFractions) appendKb(kbFractions[idx], idx, true);
+                  else {
+                    const s = BigInt(idx) * BigInt(BITS_PER_GROUP);
+                    const e = s + BigInt(BITS_PER_GROUP);
+                    const ones = s >= totalBitsBI ? 0n : (e <= totalBitsBI ? BigInt(BITS_PER_GROUP) : (totalBitsBI - s));
+                    appendKb(Number(ones) / BITS_PER_GROUP, idx, true);
+                  }
+                }
               } else {
                 appendByte(bytes[idx], idx);
               }
@@ -365,9 +563,10 @@
                 const canvases = Array.from(bitField.querySelectorAll('.mb-canvas')).slice(start, end);
                 if (canvases.length) canvases.forEach(c => { c.style.opacity = '0'; setTimeout(() => c.style.opacity = '1', 6); });
               } else {
-                // KB-level canvas animations: fade in the freshly added canvases
+                // KB-level canvas animations use per-row reveal inside drawKbBlock; no additional opacity animation needed.
+                // Keep a very short no-op to preserve timing.
                 const canvases = Array.from(bitField.querySelectorAll('.kb-canvas')).slice(start, end);
-                if (canvases.length) canvases.forEach(c => { c.style.opacity = '0'; setTimeout(() => c.style.opacity = '1', 6); });
+                if (canvases.length) canvases.forEach(c => { /* no-op: per-row animation is handled on draw */ });
               }
             } else {
               const sliceStart = start * 8;
@@ -470,6 +669,18 @@
 
     staggerUpdate(newBitsArr, { prev: prevBitsArr });
     lastBits = newBitsArr.slice();
+  }
+
+  // Lazily build a 8192-bit (KB) string for the given KB index when necessary.
+  function buildKbChunkString(totalBitsBI, gi) {
+    const start = BigInt(gi) * BigInt(BITS_PER_GROUP);
+    const end = start + BigInt(BITS_PER_GROUP);
+    const ones = start >= totalBitsBI ? 0n : (end <= totalBitsBI ? BigInt(BITS_PER_GROUP) : (totalBitsBI - start));
+    const onesNum = Number(ones);
+    if (onesNum <= 0) return '0'.repeat(BITS_PER_GROUP);
+    if (onesNum >= BITS_PER_GROUP) return '1'.repeat(BITS_PER_GROUP);
+    // place ones at the left for nicer visual fill (MSB side)
+    return '1'.repeat(onesNum).padEnd(BITS_PER_GROUP, '0');
   }
 
   // wire cancel button to abort long renders

@@ -6,6 +6,7 @@
     "test:e2e": "npx playwright test --timeout=120000"
   },
   "devDependencies": {
-    "@playwright/test": "^1.38.0"
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^25.0.0"
   }
 }
