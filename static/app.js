@@ -1467,8 +1467,23 @@
     // stop native cursor movement / selection changes
     e.preventDefault();
 
-    // modifier precedence: Alt (1000) > Ctrl (100) > Shift (10) > none (1)
-    const step = e.altKey ? 1000n : (e.ctrlKey ? 100n : (e.shiftKey ? 10n : 1n));
+      // modifier mapping to step sizes
+      // - ArrowUp / ArrowDown change value by 1
+      // - Shift + Arrow -> change by 10
+      // - Ctrl  + Arrow -> change by 100
+      // - Alt   + Arrow -> change by 1000
+      // - Ctrl + Shift + Arrow -> change by 10000
+      // - Shift + Alt + Arrow -> change by 100000
+      // - Ctrl + Alt + Arrow -> change by 1000000
+      // - Ctrl + Shift + Alt + Arrow -> change by 10000000
+      let step = 1n;
+      if (e.ctrlKey && e.shiftKey && e.altKey) step = 10000000n;
+      else if (e.ctrlKey && e.altKey) step = 1000000n;
+      else if (e.shiftKey && e.altKey) step = 100000n;
+      else if (e.ctrlKey && e.shiftKey) step = 10000n;
+      else if (e.altKey) step = 1000n;
+      else if (e.ctrlKey) step = 100n;
+      else if (e.shiftKey) step = 10n;
     const dir = e.key === 'ArrowUp' ? 1n : -1n;
 
     const current = parseNumber(numberInput.value || '0');

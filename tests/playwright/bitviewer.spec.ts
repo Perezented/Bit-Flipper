@@ -25,6 +25,7 @@ test.describe('Bit Flipper bit viewer tests', () => {
     await page.goto('/');
     const hint = page.locator('.modifier-tip');
     await expect(hint).toBeVisible();
+    await expect(hint).toContainText('Ctrl + Shift + Alt');
 
     const input = page.locator('#number-input');
     await input.fill('0');
@@ -51,6 +52,40 @@ test.describe('Bit Flipper bit viewer tests', () => {
     await page.keyboard.press('ArrowUp');
     await page.keyboard.up('Alt');
     await expect(input).toHaveValue('1111');
+
+    // Ctrl+Shift+ArrowUp -> +10000
+    await page.keyboard.down('Control');
+    await page.keyboard.down('Shift');
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.up('Shift');
+    await page.keyboard.up('Control');
+    await expect(input).toHaveValue('11111');
+
+    // Shift+Alt+ArrowUp -> +100000
+    await page.keyboard.down('Shift');
+    await page.keyboard.down('Alt');
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.up('Alt');
+    await page.keyboard.up('Shift');
+    await expect(input).toHaveValue('111111');
+
+    // Ctrl+Alt+ArrowUp -> +1000000
+    await page.keyboard.down('Control');
+    await page.keyboard.down('Alt');
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.up('Alt');
+    await page.keyboard.up('Control');
+    await expect(input).toHaveValue('1111111');
+
+    // Ctrl+Shift+Alt+ArrowUp -> +10000000
+    await page.keyboard.down('Control');
+    await page.keyboard.down('Shift');
+    await page.keyboard.down('Alt');
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.up('Alt');
+    await page.keyboard.up('Shift');
+    await page.keyboard.up('Control');
+    await expect(input).toHaveValue('11111111');
   });
 
 });
