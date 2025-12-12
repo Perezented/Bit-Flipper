@@ -532,3 +532,7 @@ footer {
 .help-content {
   text-align: start;
 }
+
+#value-unit-reference {
+  color: rgb(105, 105, 105) !important;
+}

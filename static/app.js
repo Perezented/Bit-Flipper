@@ -2,7 +2,7 @@
   const numberInput = document.getElementById('number-input');
   const bitField = document.getElementById('bitField');
   const valueUnit = document.getElementById('value-unit');
-  const valueUnitGB = document.getElementById('value-unit-gb');
+  const valueUnitReference = document.getElementById('value-unit-reference');
   const modeSelect = document.getElementById('mode');
   const unitSelect = document.getElementById('unit-select');
   const loader = document.getElementById('loader');
@@ -44,11 +44,11 @@
 
   // Input constraints
   const BITCOUNT_MAX_LEN = 43; // maximum characters allowed when in bitcount mode
-  const BITCOUNT_MAX_LEN_TB = 30 // maximum characters allowed when in bitcount mode with TB unit
-  const BITCOUNT_MAX_LEN_GB = 33 // maximum characters allowed when in bitcount mode with GB unit
-  const BITCOUNT_MAX_LEN_MB = 36 // maximum characters allowed when in bitcount mode with MB unit
-  const BITCOUNT_MAX_LEN_KB = 39 // maximum characters allowed when in bitcount mode with MB unit
-  const BITCOUNT_MAX_LEN_BYTES = 42 // maximum characters allowed when in bitcount mode with MB unit
+  const BITCOUNT_MAX_LEN_TB = 30; // maximum characters allowed when in bitcount mode with TB unit
+  const BITCOUNT_MAX_LEN_GB = 33; // maximum characters allowed when in bitcount mode with GB unit
+  const BITCOUNT_MAX_LEN_MB = 36; // maximum characters allowed when in bitcount mode with MB unit
+  const BITCOUNT_MAX_LEN_KB = 39; // maximum characters allowed when in bitcount mode with MB unit
+  const BITCOUNT_MAX_LEN_BYTES = 42; // maximum characters allowed when in bitcount mode with MB unit
   const BINARY_MAX_LEN = 90; // maximum characters allowed when in binary mode
 
   function getMaxLenForMode(m) {
@@ -214,7 +214,7 @@
     } else {
       // binary mode: interpret value as an integer and show its binary groups (MSB-first)
       const n = BigInt(value);
-      valueUnitGB.textContent = '';
+      valueUnitReference.textContent = '';
       try { if (DEBUG_RENDER) console.log('render-binary', { n: String(n), binLen: (n === 0n ? 1 : n.toString(2).length) }); } catch (e) { }
       bytesCountForUnit = n; // treat as raw bytes count when showing unit
 
@@ -233,9 +233,39 @@
     // Update textual values
     // For bitcount mode show number of bytes derived from bits; for binary mode show the integer in bytes units
     valueUnit.textContent = humanizeBytes(bytesCountForUnit);
+    const convertBitCountToKB = (bits) => Number(bits) / 8192;
     const convertBitCountToMB = (bits) => Number(bits) / 8192 / 1024;
     const convertBitCountToGB = (bits) => Number(bits) / 8192 / 1024 / 1024;
-    valueUnitGB.textContent = Number(numberInput.value) >= 8388608 ? convertBitCountToGB(numberInput.value) + ' GB' : convertBitCountToMB(numberInput.value) + ' MB';
+    const convertBitCountToTB = (bits) => Number(bits) / 8192 / 1024 / 1024 / 1024;
+    const convertBitCountToPB = (bits) => Number(bits) / 8192 / 1024 / 1024 / 1024 / 1024;
+    const convertBitCountToEB = (bits) => Number(bits) / 8192 / 1024 / 1024 / 1024 / 1024 / 1024;
+    const convertBitCountToZB = (bits) => Number(bits) / 8192 / 1024 / 1024 / 1024 / 1024 / 1024 / 1024;
+    const convertBitCountToYB = (bits) => Number(bits) / 8192 / 1024 / 1024 / 1024 / 1024 / 1024 / 1024 / 1024;
+    if (Number(numberInput.value) >= 9444732965739300000000) {
+      valueUnitReference.textContent = convertBitCountToYB(numberInput.value) + ' YB';
+    }
+    if (Number(numberInput.value) >= 9223372036854780000 && Number(numberInput.value) < 9444732965739300000000) {
+      valueUnitReference.textContent = convertBitCountToZB(numberInput.value) + ' ZB';
+    }
+    if (Number(numberInput.value) >= 9007199254740990 && Number(numberInput.value) < 9223372036854780000) {
+      valueUnitReference.textContent = convertBitCountToEB(numberInput.value) + ' EB';
+    }
+    if (Number(numberInput.value) >= 8796093022208 && Number(numberInput.value) < 9007199254740990) {
+      valueUnitReference.textContent = convertBitCountToPB(numberInput.value) + ' PB';
+    }
+    if (Number(numberInput.value) >= 8589934592 && Number(numberInput.value) < 8796093022208) {
+      valueUnitReference.textContent = convertBitCountToTB(numberInput.value) + ' TB';
+    }
+    if (Number(numberInput.value) >= 8388608 && Number(numberInput.value) < 8589934592) {
+      valueUnitReference.textContent = convertBitCountToGB(numberInput.value) + ' GB';
+    }
+    if (Number(numberInput.value) >= 8192 && Number(numberInput.value) < 8388608) {
+      valueUnitReference.textContent = convertBitCountToMB(numberInput.value) + ' MB';
+    }
+    if (Number(numberInput.value) < 8192) {
+      valueUnitReference.textContent = convertBitCountToKB(numberInput.value) + ' KB';
+    }
+
     // compute and set sizing classes after grouping decision below (moved)
 
     // now build or update DOM
@@ -1481,23 +1511,23 @@
     // stop native cursor movement / selection changes
     e.preventDefault();
 
-      // modifier mapping to step sizes
-      // - ArrowUp / ArrowDown change value by 1
-      // - Shift + Arrow -> change by 10
-      // - Ctrl  + Arrow -> change by 100
-      // - Alt   + Arrow -> change by 1000
-      // - Ctrl + Shift + Arrow -> change by 10000
-      // - Shift + Alt + Arrow -> change by 100000
-      // - Ctrl + Alt + Arrow -> change by 1000000
-      // - Ctrl + Shift + Alt + Arrow -> change by 10000000
-      let step = 1n;
-      if (e.ctrlKey && e.shiftKey && e.altKey) step = 10000000n;
-      else if (e.ctrlKey && e.altKey) step = 1000000n;
-      else if (e.shiftKey && e.altKey) step = 100000n;
-      else if (e.ctrlKey && e.shiftKey) step = 10000n;
-      else if (e.altKey) step = 1000n;
-      else if (e.ctrlKey) step = 100n;
-      else if (e.shiftKey) step = 10n;
+    // modifier mapping to step sizes
+    // - ArrowUp / ArrowDown change value by 1
+    // - Shift + Arrow -> change by 10
+    // - Ctrl  + Arrow -> change by 100
+    // - Alt   + Arrow -> change by 1000
+    // - Ctrl + Shift + Arrow -> change by 10000
+    // - Shift + Alt + Arrow -> change by 100000
+    // - Ctrl + Alt + Arrow -> change by 1000000
+    // - Ctrl + Shift + Alt + Arrow -> change by 10000000
+    let step = 1n;
+    if (e.ctrlKey && e.shiftKey && e.altKey) step = 10000000n;
+    else if (e.ctrlKey && e.altKey) step = 1000000n;
+    else if (e.shiftKey && e.altKey) step = 100000n;
+    else if (e.ctrlKey && e.shiftKey) step = 10000n;
+    else if (e.altKey) step = 1000n;
+    else if (e.ctrlKey) step = 100n;
+    else if (e.shiftKey) step = 10n;
     const dir = e.key === 'ArrowUp' ? 1n : -1n;
 
     const current = parseNumber(numberInput.value || '0');
