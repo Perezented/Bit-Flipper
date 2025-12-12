@@ -57,4 +57,41 @@ test.describe('Bit Flipper number input tests', () => {
     await expect(bitsInLastByte).toHaveCount(6);
   });
 
+  test('input is truncated based on mode (bitcount)', async ({ page }) => {
+    await page.goto('/');
+    await page.selectOption('#mode', 'bitcount');
+    const input = page.locator('#number-input');
+    // create a value longer than the limit (42 for bitcount)
+    const longVal = '9'.repeat(50);
+    await input.fill(longVal);
+    const val = await input.inputValue();
+    // Expect the input value length to be at most 42
+    expect(val.length).toBeLessThanOrEqual(42);
+  });
+
+  test('input is truncated based on mode (binary)', async ({ page }) => {
+    await page.goto('/');
+    await page.selectOption('#mode', 'binary');
+    const input = page.locator('#number-input');
+    // create a value longer than the limit (90 for binary)
+    const longVal = '9'.repeat(100);
+    await input.fill(longVal);
+    const val = await input.inputValue();
+    // Expect the input value length to be at most 90
+    expect(val.length).toBeLessThanOrEqual(90);
+  });
+
+  test('input gets truncated when switching to a shorter max-length mode', async ({ page }) => {
+    await page.goto('/');
+    // start in binary mode and set a value shorter than 90 but longer than 42
+    await page.selectOption('#mode', 'binary');
+    const input = page.locator('#number-input');
+    const longBinaryValue = '9'.repeat(70);
+    await input.fill(longBinaryValue);
+    // now switch to bitcount -> should apply 42 length and truncate existing value
+    await page.selectOption('#mode', 'bitcount');
+    const val = await input.inputValue();
+    expect(val.length).toBeLessThanOrEqual(42);
+  });
+
 });

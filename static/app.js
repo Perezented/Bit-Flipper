@@ -2,6 +2,7 @@
   const numberInput = document.getElementById('number-input');
   const bitField = document.getElementById('bitField');
   const valueUnit = document.getElementById('value-unit');
+  const valueUnitGB = document.getElementById('value-unit-gb');
   const modeSelect = document.getElementById('mode');
   const unitSelect = document.getElementById('unit-select');
   const loader = document.getElementById('loader');
@@ -40,6 +41,28 @@
 
   // Keep last bits to animate differences
   let lastBits = [];
+
+  // Input constraints
+  const BITCOUNT_MAX_LEN = 42; // maximum characters allowed when in bitcount mode
+  const BINARY_MAX_LEN = 90; // maximum characters allowed when in binary mode
+
+  function getMaxLenForMode(m) {
+    return m === 'bitcount' ? BITCOUNT_MAX_LEN : BINARY_MAX_LEN;
+  }
+
+  function applyModeMaxLength() {
+    try {
+      if (!numberInput) return;
+      const max = getMaxLenForMode(mode);
+      numberInput.maxLength = max;
+      // Truncate current value if necessary
+      if (numberInput.value && numberInput.value.length > max) {
+        numberInput.value = numberInput.value.slice(0, max);
+      }
+    } catch (e) { /* ignore */ }
+  }
+  // set initial input max length based on starting mode
+  applyModeMaxLength();
 
   function parseNumber(text) {
     if (!text) return 0n;
@@ -177,6 +200,7 @@
     } else {
       // binary mode: interpret value as an integer and show its binary groups (MSB-first)
       const n = BigInt(value);
+      valueUnitGB.textContent = '';
       try { if (DEBUG_RENDER) console.log('render-binary', { n: String(n), binLen: (n === 0n ? 1 : n.toString(2).length) }); } catch (e) { }
       bytesCountForUnit = n; // treat as raw bytes count when showing unit
 
@@ -195,7 +219,9 @@
     // Update textual values
     // For bitcount mode show number of bytes derived from bits; for binary mode show the integer in bytes units
     valueUnit.textContent = humanizeBytes(bytesCountForUnit);
-
+    const convertBitCountToMB = (bits) => Number(bits) / 8192 / 1024;
+    const convertBitCountToGB = (bits) => Number(bits) / 8192 / 1024 / 1024;
+    valueUnitGB.textContent = Number(numberInput.value) >= 8388608 ? convertBitCountToGB(numberInput.value) + ' GB' : convertBitCountToMB(numberInput.value) + ' MB';
     // compute and set sizing classes after grouping decision below (moved)
 
     // now build or update DOM
@@ -1296,8 +1322,13 @@
       const current = parseNumber(numberInput.value || '0');
       let next = action === 'decrement' ? current - step : current + step;
       if (next < 0n) next = 0n;
-      numberInput.value = next.toString();
-      const converted = (mode === 'bitcount') ? next * (UNIT_TO_BITS[unit] || 1n) : next;
+      let nextStr = next.toString();
+      try {
+        const max = Number(numberInput.maxLength || 0);
+        if (max > 0 && nextStr.length > max) nextStr = nextStr.slice(0, max);
+      } catch (e) { /* ignore */ }
+      numberInput.value = nextStr;
+      const converted = (mode === 'bitcount') ? (parseNumber(numberInput.value) * (UNIT_TO_BITS[unit] || 1n)) : parseNumber(numberInput.value);
       render(converted);
     });
   });
@@ -1408,6 +1439,13 @@
   numberInput.addEventListener('input', () => {
     if (timeoutId) clearTimeout(timeoutId);
     timeoutId = setTimeout(() => {
+      // enforce max length in case of programmatic or pasted values
+      try {
+        const max = Number(numberInput.maxLength || 0);
+        if (max > 0 && numberInput.value && numberInput.value.length > max) {
+          numberInput.value = numberInput.value.slice(0, max);
+        }
+      } catch (e) { /* ignore */ }
       const n = parseNumber(numberInput.value);
       // Convert the parsed number to bits depending on the unit selection when in bitcount mode
       const converted = (mode === 'bitcount') ? (n * (UNIT_TO_BITS[unit] || 1n)) : n;
@@ -1420,6 +1458,10 @@
   // - Shift + Arrow -> change by 10
   // - Ctrl  + Arrow -> change by 100
   // - Alt   + Arrow -> change by 1000
+  // - Ctrl + Shift + Arrow -> change by 10000
+  // - Shift + Alt + Arrow -> change by 100000
+  // - Ctrl + Alt + Arrow -> change by 1000000
+  // - Ctrl + Shift + Alt + Arrow -> change by 10000000
   numberInput.addEventListener('keydown', (e) => {
     if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
     // stop native cursor movement / selection changes
@@ -1432,8 +1474,14 @@
     const current = parseNumber(numberInput.value || '0');
     let next = current + (step * dir);
     if (next < 0n) next = 0n;
-    numberInput.value = next.toString();
-    const converted = (mode === 'bitcount') ? next * (UNIT_TO_BITS[unit] || 1n) : next;
+    let nextStr = next.toString();
+    // respect max length if set
+    try {
+      const max = Number(numberInput.maxLength || 0);
+      if (max > 0 && nextStr.length > max) nextStr = nextStr.slice(0, max);
+    } catch (e) { /* ignore */ }
+    numberInput.value = nextStr;
+    const converted = (mode === 'bitcount') ? (parseNumber(numberInput.value) * (UNIT_TO_BITS[unit] || 1n)) : parseNumber(numberInput.value);
     render(converted);
   });
 
@@ -1441,6 +1489,8 @@
   if (modeSelect) {
     modeSelect.addEventListener('change', (e) => {
       mode = e.target.value;
+      // update maxlength for input when mode changes
+      try { applyModeMaxLength(); } catch (err) { /* ignore */ }
       if (inputLabel) {
         if (mode === 'bitcount') {
           if (unit === 'bits') inputLabel.textContent = 'Enter bit count:';
