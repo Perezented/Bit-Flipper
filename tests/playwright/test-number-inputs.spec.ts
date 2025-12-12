@@ -94,4 +94,45 @@ test.describe('Bit Flipper number input tests', () => {
     expect(val.length).toBeLessThanOrEqual(42);
   });
 
+  test('bitcount unit MB sets maxlength and truncates', async ({ page }) => {
+    await page.goto('/');
+    await page.selectOption('#mode', 'bitcount');
+    await page.selectOption('#unit-select', 'MB');
+    const input = page.locator('#number-input');
+    // Ensure maxlength attribute set
+    const maxLenAttr = await input.getAttribute('maxlength');
+    expect(Number(maxLenAttr)).toBeLessThanOrEqual(36);
+    // Fill a long value and ensure it gets truncated to <=36
+    const longVal = '9'.repeat(50);
+    await input.fill(longVal);
+    const val = await input.inputValue();
+    expect(val.length).toBeLessThanOrEqual(36);
+  });
+
+  test('bitcount unit GB sets maxlength and truncates', async ({ page }) => {
+    await page.goto('/');
+    await page.selectOption('#mode', 'bitcount');
+    await page.selectOption('#unit-select', 'GB');
+    const input = page.locator('#number-input');
+    const maxLenAttr = await input.getAttribute('maxlength');
+    expect(Number(maxLenAttr)).toBeLessThanOrEqual(33);
+    const longVal = '9'.repeat(50);
+    await input.fill(longVal);
+    const val = await input.inputValue();
+    expect(val.length).toBeLessThanOrEqual(33);
+  });
+
+  test('bitcount unit TB sets maxlength and truncates', async ({ page }) => {
+    await page.goto('/');
+    await page.selectOption('#mode', 'bitcount');
+    await page.selectOption('#unit-select', 'TB');
+    const input = page.locator('#number-input');
+    const maxLenAttr = await input.getAttribute('maxlength');
+    expect(Number(maxLenAttr)).toBeLessThanOrEqual(30);
+    const longVal = '9'.repeat(50);
+    await input.fill(longVal);
+    const val = await input.inputValue();
+    expect(val.length).toBeLessThanOrEqual(30);
+  });
+
 });

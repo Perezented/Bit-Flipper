@@ -43,11 +43,25 @@
   let lastBits = [];
 
   // Input constraints
-  const BITCOUNT_MAX_LEN = 42; // maximum characters allowed when in bitcount mode
+  const BITCOUNT_MAX_LEN = 43; // maximum characters allowed when in bitcount mode
+  const BITCOUNT_MAX_LEN_TB = 30 // maximum characters allowed when in bitcount mode with TB unit
+  const BITCOUNT_MAX_LEN_GB = 33 // maximum characters allowed when in bitcount mode with GB unit
+  const BITCOUNT_MAX_LEN_MB = 36 // maximum characters allowed when in bitcount mode with MB unit
+  const BITCOUNT_MAX_LEN_KB = 39 // maximum characters allowed when in bitcount mode with MB unit
+  const BITCOUNT_MAX_LEN_BYTES = 42 // maximum characters allowed when in bitcount mode with MB unit
   const BINARY_MAX_LEN = 90; // maximum characters allowed when in binary mode
 
   function getMaxLenForMode(m) {
-    return m === 'bitcount' ? BITCOUNT_MAX_LEN : BINARY_MAX_LEN;
+    if (m !== 'bitcount') return BINARY_MAX_LEN;
+    // For bitcount mode, adjust maxlength depending on the selected unit
+    try {
+      if (unit === 'TB') return BITCOUNT_MAX_LEN_TB;
+      if (unit === 'GB') return BITCOUNT_MAX_LEN_GB;
+      if (unit === 'MB') return BITCOUNT_MAX_LEN_MB;
+      if (unit === 'KB') return BITCOUNT_MAX_LEN_KB;
+      if (unit === 'Bytes') return BITCOUNT_MAX_LEN_BYTES;
+    } catch (e) { /* ignore */ }
+    return BITCOUNT_MAX_LEN;
   }
 
   function applyModeMaxLength() {
@@ -1532,6 +1546,8 @@
   if (unitSelect) {
     unitSelect.addEventListener('change', (e) => {
       unit = e.target.value;
+      // update maxlength when unit changes (affects bitcount mode)
+      try { applyModeMaxLength(); } catch (err) { /* ignore */ }
       if (inputLabel && mode === 'bitcount') {
         if (unit === 'bits') inputLabel.textContent = 'Enter bit count:';
         else if (unit === 'bytes') inputLabel.textContent = 'Enter byte count';
