@@ -172,13 +172,13 @@ test.describe('Bit Flipper large input rendering', () => {
     // By default binary mode should be selected and unit select hidden
     await expect(mode).toHaveValue('binary');
     await expect(unitSelect).toBeHidden();
-    await expect(inputLabel).toHaveText('Enter bit count');
+    await expect(inputLabel).toHaveText('Enter bit count:');
 
     // Switch to bitcount and ensure unitSelect visible and label updates
     await page.selectOption('#mode', 'bitcount');
     await expect(unitSelect).toBeVisible();
     // default unit 'bits' should use bit label
-    await expect(inputLabel).toHaveText('Enter bit count');
+    await expect(inputLabel).toHaveText('Enter bit count:');
 
     // change unit to KB and check label
     await page.selectOption('#unit-select', 'KB');

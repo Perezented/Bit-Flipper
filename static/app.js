@@ -14,7 +14,7 @@
 
   // Feature gate for render debugging (use query param `?DEBUG_RENDER=true`,
   // sessionStorage or `window.DEBUG_RENDER = true` to enable)
-  const DEBUG_RENDER = (function () {
+  const DEBUG_RENDER = (function() {
     try {
       const url = (typeof window !== 'undefined' && window.location && window.location.search) ? window.location.search : '';
       const params = new URLSearchParams(url);
@@ -59,12 +59,21 @@
     KB: 8192n, // 1024 bytes * 8
     MB: 8192n * 1024n,
     GB: 8192n * 1024n * 1024n,
-    TB: 8192n * 1024n * 1024n * 1024n
+    TB: 8192n * 1024n * 1024n * 1024n,
+    PB: 8192n * 1024n * 1024n * 1024n * 1024n,
+    EB: 8192n * 1024n * 1024n * 1024n * 1024n * 1024n,
+    ZB: 8192n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n,
+    YB: 8192n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n,
+    BB: 8192n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n,
+    NB: 8192n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n,
+    DB: 8192n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n,
+    QB: 8192n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n,
+    OB: 8192n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n * 1024n
   };
 
   // Single `humanizeBytes` implementation that handles Numbers and BigInts.
   function humanizeBytes(bytes) {
-    const units = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB'];
+    const units = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB', 'BB', 'NB', 'DB', 'QB', 'OB'];
     // Helper to format a float with up to two decimals, dropping .00
     const fmt = (v) => (v % 1 === 0 ? v.toFixed(0) : v.toFixed(2));
 
@@ -119,7 +128,7 @@
   const GROUPS_PER_LEVEL = 1024; // how many KB blocks make an MB
 
   function render(value) {
-    try { if (DEBUG_RENDER) console.log('render-start', { mode, inputValue: numberInput ? numberInput.value : null, value: String(value) }); } catch (e) {}
+    try { if (DEBUG_RENDER) console.log('render-start', { mode, inputValue: numberInput ? numberInput.value : null, value: String(value) }); } catch (e) { }
     // value is a BigInt from the input; interpretation depends on `mode`.
     let bytes = [];
     let bytesCountForUnit = 0n;
@@ -139,7 +148,7 @@
     if (mode === 'bitcount') {
       // interpret `value` as a bit count
       const totalBits = BigInt(value);
-      try { if (DEBUG_RENDER) console.log('render-bitcount', { totalBits: String(totalBits), fullBytes: String(totalBits / 8n) }); } catch(e) {}
+      try { if (DEBUG_RENDER) console.log('render-bitcount', { totalBits: String(totalBits), fullBytes: String(totalBits / 8n) }); } catch (e) { }
       const fullBytes = totalBits / 8n; // BigInt
       const remainder = Number(totalBits % 8n);
       bytesCountForUnit = fullBytes;
@@ -157,7 +166,7 @@
           bytes.push(partial);
         }
         if (bytes.length === 0) bytes.push(Array(8).fill('0'));
-        try { if (DEBUG_RENDER) console.debug('render-small', { fullBytes: String(fullBytes), remainder, bytesLen: bytes.length }); } catch (e) {}
+        try { if (DEBUG_RENDER) console.debug('render-small', { fullBytes: String(fullBytes), remainder, bytesLen: bytes.length }); } catch (e) { }
       } else {
         // large: do not create per-byte arrays — compute just the counts needed
         // We'll set bytes to be an array of empty placeholders for sizing only.
@@ -168,7 +177,7 @@
     } else {
       // binary mode: interpret value as an integer and show its binary groups (MSB-first)
       const n = BigInt(value);
-      try { if (DEBUG_RENDER) console.log('render-binary', { n: String(n), binLen: (n === 0n ? 1 : n.toString(2).length) }); } catch (e) {}
+      try { if (DEBUG_RENDER) console.log('render-binary', { n: String(n), binLen: (n === 0n ? 1 : n.toString(2).length) }); } catch (e) { }
       bytesCountForUnit = n; // treat as raw bytes count when showing unit
 
       // convert to binary string
@@ -206,7 +215,7 @@
       const totalBitsNumber = Number(totalBitsBI > 9_000_000_000n ? 9_000_000_000 : totalBitsBI);
       groupCount = Math.ceil(Number(totalBitsBI) / BITS_PER_GROUP);
       // Determine highest grouping level to render based on groupCount
-      // levelIndex: 0 = KB, 1 = MB, 2 = GB, 3 = TB, 4 = PB, 5 = EB, 6 = ZB
+      // levelIndex: 0 = KB, 1 = MB, 2 = GB, 3 = TB, 4 = PB, 5 = EB, 6 = ZB, 7 = YB, 8 = BB, 9 = NB, 10 = DB, 11 = QB, 12 = OB
       const LEVEL_NAMES = ['KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB', 'BB', 'NB', 'DB', 'QB', 'OB'];
       levelIndex = 0;
       groupsAtLevel = groupCount; // effective groups count at currently chosen level
@@ -295,7 +304,14 @@
           else if (prevLevelIndex === 3) prevGroupsAtLevel = bitField.querySelectorAll('.tb-block').length;
           else if (prevLevelIndex === 4) prevGroupsAtLevel = bitField.querySelectorAll('.pb-block').length;
           else if (prevLevelIndex === 5) prevGroupsAtLevel = bitField.querySelectorAll('.eb-block').length;
-          else prevGroupsAtLevel = bitField.querySelectorAll('.zb-block').length;
+          else if (prevLevelIndex === 6) prevGroupsAtLevel = bitField.querySelectorAll('.zb-block').length;
+          else if (prevLevelIndex === 7) prevGroupsAtLevel = bitField.querySelectorAll('.yb-block').length;
+          else if (prevLevelIndex === 8) prevGroupsAtLevel = bitField.querySelectorAll('.bb-block').length;
+          else if (prevLevelIndex === 9) prevGroupsAtLevel = bitField.querySelectorAll('.nb-block').length;
+          else if (prevLevelIndex === 10) prevGroupsAtLevel = bitField.querySelectorAll('.db-block').length;
+          else if (prevLevelIndex === 11) prevGroupsAtLevel = bitField.querySelectorAll('.qb-block').length;
+          else if (prevLevelIndex === 12) prevGroupsAtLevel = bitField.querySelectorAll('.ob-block').length;
+          else prevGroupsAtLevel = 0;
         } catch (e) { prevGroupsAtLevel = 0; }
       }
       try {
@@ -305,7 +321,7 @@
           delete bitField.dataset.rendered;
           bitField.innerHTML = '';
         }
-      } catch(e) { /* ignore usage errors computing previous counts */ }
+      } catch (e) { /* ignore usage errors computing previous counts */ }
       // expose grouping details to the DOM for diagnostics
       try {
         if (bitField) {
@@ -353,7 +369,7 @@
         if (loader) { loader.classList.remove('hidden'); loader.setAttribute('aria-hidden', 'false'); loader.querySelector('.loader-label').textContent = 'Computing summary…'; }
         tryServerSummary(tb).then((srv) => {
           if (srv && srv.length) kbFractions = srv;
-        }).catch(() => {}).finally(() => { if (loader) { loader.classList.add('hidden'); loader.setAttribute('aria-hidden', 'true'); } });
+        }).catch(() => { }).finally(() => { if (loader) { loader.classList.add('hidden'); loader.setAttribute('aria-hidden', 'true'); } });
       }
     }
 
@@ -381,7 +397,7 @@
     // decide whether a full rebuild is needed (length differs) or we can update in-place
     const currentBitsFlat = bitField.dataset.rendered ? Array.from(bitField.querySelectorAll('.bit, .cell')).map(b => b.dataset.value || '0').join('') : null;
     // If grouping/level changed since last render, force a rebuild to replace DOM types
-      try {
+    try {
       // If either grouping mode/level changed or the number of groups at the
       // current level changed (for example 2 KB -> 3 KB) we must rebuild the DOM
       // instead of attempting an in-place update. See test case where changing
@@ -416,7 +432,7 @@
         document.body.appendChild(dbg);
       }
       dbg.textContent = `mode=${mode} bytes=${String(bytesCountForUnit)} useGrouping=${useGrouping} groupCount=${groupCount} levelIndex=${levelIndex} groupsAtLevel=${groupsAtLevel} totalCells=${totalCells}`;
-    } catch (e) {}
+    } catch (e) { }
     const heavyThreshold = 180; // number of byte groups considered heavy to render
 
     // Debug visibility for grouping decisions (useful in test logs)
@@ -590,6 +606,12 @@
         const drawPbBlock = (canvas, pbArray) => drawLevelBlock(canvas, pbArray, 4);
         const drawEbBlock = (canvas, ebArray) => drawLevelBlock(canvas, ebArray, 5);
         const drawZbBlock = (canvas, zbArray) => drawLevelBlock(canvas, zbArray, 6);
+        const drawYbBlock = (canvas, ybArray) => drawLevelBlock(canvas, ybArray, 7);
+        const drawBbBlock = (canvas, bbArray) => drawLevelBlock(canvas, bbArray, 8);
+        const drawNbBlock = (canvas, nbArray) => drawLevelBlock(canvas, nbArray, 9);
+        const drawDbBlock = (canvas, dbArray) => drawLevelBlock(canvas, dbArray, 10);
+        const drawQbBlock = (canvas, qbArray) => drawLevelBlock(canvas, qbArray, 11);
+        const drawObBlock = (canvas, obArray) => drawLevelBlock(canvas, obArray, 12);
 
         // helper to append an MB group DOM (collection of GROUPS_PER_LEVEL KB tiles)
         const appendMb = (mbArray, idx) => {
@@ -697,13 +719,6 @@
           canvas.style.opacity = '0';
           setTimeout(() => { canvas.style.transition = 'opacity 280ms ease'; canvas.style.opacity = '1'; }, 12);
         };
-        const drawYbBlock = (canvas, ybArray) => drawLevelBlock(canvas, ybArray, 7);
-        const drawBbBlock = (canvas, bbArray) => drawLevelBlock(canvas, bbArray, 8);
-        const drawNbBlock = (canvas, nbArray) => drawLevelBlock(canvas, nbArray, 9);
-        const drawDbBlock = (canvas, dbArray) => drawLevelBlock(canvas, dbArray, 10);
-        const drawQbBlock = (canvas, qbArray) => drawLevelBlock(canvas, qbArray, 11);
-        const drawObBlock = (canvas, obArray) => drawLevelBlock(canvas, obArray, 12);
-
         const appendYb = (ybArray, idx) => {
           const ybEl = document.createElement('div');
           ybEl.className = 'yb-block';
@@ -896,20 +911,86 @@
                   const frac = Number(ones) / Number(bitsPerPb);
                   appendEb(new Array(GROUPS_PER_LEVEL).fill(frac), i);
                 }
-              } else {
-                // ZB or beyond
-                if (zbGroups && zbGroups[i]) appendZb(zbGroups[i], i);
-                else if (zbFractions && zbFractions[i] !== undefined) {
-                  const base = i * GROUPS_PER_LEVEL;
-                  const slice = zbFractions.slice(base, base + GROUPS_PER_LEVEL);
-                  appendZb(slice, i);
-                } else {
+              } else if (levelIndex === 6) {
+                if (zbFractions && zbFractions[i] !== undefined) appendZb(zbFractions[i], i);
+                else {
                   const bitsPerEb = BigInt(BITS_PER_GROUP) * BigInt(GROUPS_PER_LEVEL) ** 5n;
                   const startBits = BigInt(i) * bitsPerEb;
                   const endBits = startBits + bitsPerEb;
                   const ones = startBits >= totalBitsBI ? 0n : (endBits <= totalBitsBI ? bitsPerEb : (totalBitsBI - startBits));
                   const frac = Number(ones) / Number(bitsPerEb);
                   appendZb(new Array(GROUPS_PER_LEVEL).fill(frac), i);
+                }
+              } else if (levelIndex === 7) {
+                if (ybFractions && ybFractions[i] !== undefined) appendYb(ybFractions[i], i);
+                else {
+                  const bitsPerZb = BigInt(BITS_PER_GROUP) * BigInt(GROUPS_PER_LEVEL) ** 6n;
+                  const startBits = BigInt(i) * bitsPerZb;
+                  const endBits = startBits + bitsPerZb;
+                  const ones = startBits >= totalBitsBI ? 0n : (endBits <= totalBitsBI ? bitsPerZb : (totalBitsBI - startBits));
+                  const frac = Number(ones) / Number(bitsPerZb);
+                  appendYb(new Array(GROUPS_PER_LEVEL).fill(frac), i);
+                }
+              } else if (levelIndex === 8) {
+                if (bbFractions && bbFractions[i] !== undefined) appendBb(bbFractions[i], i);
+                else {
+                  const bitsPerYb = BigInt(BITS_PER_GROUP) * BigInt(GROUPS_PER_LEVEL) ** 7n;
+                  const startBits = BigInt(i) * bitsPerYb;
+                  const endBits = startBits + bitsPerYb;
+                  const ones = startBits >= totalBitsBI ? 0n : (endBits <= totalBitsBI ? bitsPerYb : (totalBitsBI - startBits));
+                  const frac = Number(ones) / Number(bitsPerYb);
+                  appendBb(new Array(GROUPS_PER_LEVEL).fill(frac), i);
+                }
+              } else if (levelIndex === 9) {
+                if (nbFractions && nbFractions[i] !== undefined) appendNb(nbFractions[i], i);
+                else {
+                  const bitsPerBb = BigInt(BITS_PER_GROUP) * BigInt(GROUPS_PER_LEVEL) ** 8n;
+                  const startBits = BigInt(i) * bitsPerBb;
+                  const endBits = startBits + bitsPerBb;
+                  const ones = startBits >= totalBitsBI ? 0n : (endBits <= totalBitsBI ? bitsPerBb : (totalBitsBI - startBits));
+                  const frac = Number(ones) / Number(bitsPerBb);
+                  appendNb(new Array(GROUPS_PER_LEVEL).fill(frac), i);
+                }
+              } else if (levelIndex === 10) {
+                if (dbFractions && dbFractions[i] !== undefined) appendDb(dbFractions[i], i);
+                else {
+                  const bitsPerNb = BigInt(BITS_PER_GROUP) * BigInt(GROUPS_PER_LEVEL) ** 9n;
+                  const startBits = BigInt(i) * bitsPerNb;
+                  const endBits = startBits + bitsPerNb;
+                  const ones = startBits >= totalBitsBI ? 0n : (endBits <= totalBitsBI ? bitsPerNb : (totalBitsBI - startBits));
+                  const frac = Number(ones) / Number(bitsPerNb);
+                  appendDb(new Array(GROUPS_PER_LEVEL).fill(frac), i);
+                }
+              } else if (levelIndex === 11) {
+                if (qbFractions && qbFractions[i] !== undefined) appendQb(qbFractions[i], i);
+                else {
+                  const bitsPerDb = BigInt(BITS_PER_GROUP) * BigInt(GROUPS_PER_LEVEL) ** 10n;
+                  const startBits = BigInt(i) * bitsPerDb;
+                  const endBits = startBits + bitsPerDb;
+                  const ones = startBits >= totalBitsBI ? 0n : (endBits <= totalBitsBI ? bitsPerDb : (totalBitsBI - startBits));
+                  const frac = Number(ones) / Number(bitsPerDb);
+                  appendQb(new Array(GROUPS_PER_LEVEL).fill(frac), i);
+                }
+              } else if (levelIndex === 12) {
+                if (obFractions && obFractions[i] !== undefined) appendOb(obFractions[i], i);
+                else {
+                  const bitsPerQb = BigInt(BITS_PER_GROUP) * BigInt(GROUPS_PER_LEVEL) ** 11n;
+                  const startBits = BigInt(i) * bitsPerQb;
+                  const endBits = startBits + bitsPerQb;
+                  const ones = startBits >= totalBitsBI ? 0n : (endBits <= totalBitsBI ? bitsPerQb : (totalBitsBI - startBits));
+                  const frac = Number(ones) / Number(bitsPerQb);
+                  appendOb(new Array(GROUPS_PER_LEVEL).fill(frac), i);
+                }
+              } else {
+                // unknown levelIndex, keep using level 12
+                if (obFractions && obFractions[i] !== undefined) appendOb(obFractions[i], i);
+                else {
+                  const bitsPerOb = BigInt(BITS_PER_GROUP) * BigInt(GROUPS_PER_LEVEL) ** 12n;
+                  const startBits = BigInt(i) * bitsPerOb;
+                  const endBits = startBits + bitsPerOb;
+                  const ones = startBits >= totalBitsBI ? 0n : (endBits <= totalBitsBI ? bitsPerOb : (totalBitsBI - startBits));
+                  const frac = Number(ones) / Number(bitsPerOb);
+                  appendOb(new Array(GROUPS_PER_LEVEL).fill(frac), i);
                 }
               }
             }
@@ -933,7 +1014,7 @@
                   mbGroups = [];
                   for (let i = 0; i < kbFractions.length; i += GROUPS_PER_LEVEL) mbGroups.push(kbFractions.slice(i, i + GROUPS_PER_LEVEL));
                 }
-              }).catch(() => {}).finally(() => {
+              }).catch(() => { }).finally(() => {
                 if (loader) { loader.classList.add('hidden'); loader.setAttribute('aria-hidden', 'true'); }
               });
             }
@@ -1032,7 +1113,17 @@
                   else if (levelIndex === 3) appendTb(arr, idx);
                   else if (levelIndex === 4) appendPb(arr, idx);
                   else if (levelIndex === 5) appendEb(arr, idx);
-                  else appendZb(arr, idx);
+                  else if (levelIndex === 6) appendZb(arr, idx);
+                  else if (levelIndex === 7) appendYb(arr, idx);
+                  else if (levelIndex === 8) appendBb(arr, idx);
+                  else if (levelIndex === 9) appendNb(arr, idx);
+                  else if (levelIndex === 10) appendDb(arr, idx);
+                  else if (levelIndex === 11) appendQb(arr, idx);
+                  else if (levelIndex === 12) appendOb(arr, idx);
+                  else {
+                    // unknown levelIndex, keep using level 12
+                    appendOb(arr, idx);
+                  }
                 }
               } else {
                 appendByte(bytes[idx], idx);
@@ -1046,7 +1137,7 @@
             // for chunked append animate the newly added nodes
             if (useGrouping) {
               // pick canvas class by levelIndex
-              const canvasClass = levelIndex === 0 ? '.kb-canvas' : (levelIndex === 1 ? '.mb-canvas' : (levelIndex === 2 ? '.gb-canvas' : (levelIndex === 3 ? '.tb-canvas' : (levelIndex === 4 ? '.pb-canvas' : (levelIndex === 5 ? '.eb-canvas' : '.zb-canvas')))));
+              const canvasClass = levelIndex === 0 ? '.kb-canvas' : levelIndex === 1 ? '.mb-canvas' : levelIndex === 2 ? '.gb-canvas' : levelIndex === 3 ? '.tb-canvas' : levelIndex === 4 ? '.pb-canvas' : levelIndex === 5 ? '.eb-canvas' : levelIndex === 6 ? '.zb-canvas' : levelIndex === 7 ? '.yb-canvas' : levelIndex === 8 ? '.bb-canvas' : levelIndex === 9 ? '.nb-canvas' : levelIndex === 10 ? '.db-canvas' : levelIndex === 11 ? '.qb-canvas' : '.ob-canvas';
               const canvases = Array.from(bitField.querySelectorAll(canvasClass)).slice(start, end);
               if (canvases.length) canvases.forEach(c => {
                 if (levelIndex === 0) return; // KB-level uses internal per-row reveal
@@ -1070,7 +1161,7 @@
               try {
                 const counts = { bytes: bitField.querySelectorAll('.byte').length, kb: bitField.querySelectorAll('.kb-block').length, mb: bitField.querySelectorAll('.mb-block').length };
                 if (DEBUG_RENDER) console.debug('render-finished', counts);
-              } catch (e) {}
+              } catch (e) { }
             }
           };
 
@@ -1087,7 +1178,7 @@
         try {
           const counts = { bytes: bitField.querySelectorAll('.byte').length, kb: bitField.querySelectorAll('.kb-block').length, mb: bitField.querySelectorAll('.mb-block').length };
           if (DEBUG_RENDER) console.debug('render-finished-nonchunk', counts);
-        } catch (e) {}
+        } catch (e) { }
         return;
       }
     };
@@ -1352,7 +1443,7 @@
       mode = e.target.value;
       if (inputLabel) {
         if (mode === 'bitcount') {
-          if (unit === 'bits') inputLabel.textContent = 'Enter bit count';
+          if (unit === 'bits') inputLabel.textContent = 'Enter bit count:';
           else if (unit === 'bytes') inputLabel.textContent = 'Enter byte count';
           else inputLabel.textContent = `Enter ${unit} count`;
         } else {
@@ -1377,7 +1468,7 @@
     unitSelect.addEventListener('change', (e) => {
       unit = e.target.value;
       if (inputLabel && mode === 'bitcount') {
-        if (unit === 'bits') inputLabel.textContent = 'Enter bit count';
+        if (unit === 'bits') inputLabel.textContent = 'Enter bit count:';
         else if (unit === 'bytes') inputLabel.textContent = 'Enter byte count';
         else inputLabel.textContent = `Enter ${unit} count`;
       }
@@ -1395,5 +1486,5 @@
   numberInput.addEventListener('paste', (e) => {
     // allow paste
     setTimeout(() => { numberInput.dispatchEvent(new Event('input')); }, 1);
-  })
+  });
 })();
