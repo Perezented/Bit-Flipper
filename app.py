@@ -1,23 +1,22 @@
 from flask import Flask, send_from_directory, render_template, request, jsonify
 import os
+from typing import List, Dict, Any
 
 app = Flask(__name__, static_folder='static', template_folder='static')
 
+# Configuration Constants
+GROUP_BYTES = int(os.environ.get('GROUP_BYTES', 1024))
+BITS_PER_GROUP = GROUP_BYTES * 8
 
 @app.route('/')
-def index():
+def index() -> str:
     return render_template('index.html')
-
-
-@app.route('/static/<path:path>')
-def serve_static(path):
-    return send_from_directory('static', path)
 
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
-
+    debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    app.run(host='0.0.0.0', port=port, debug=debug)
 
 @app.route('/api/group_summary', methods=['POST'])
 def group_summary():
@@ -39,8 +38,8 @@ def group_summary():
         return jsonify(error='mode_not_supported'), 400
 
     # constants should match the client (1024 bytes => 8192 bits per KB)
-    GROUP_BYTES = 1024
-    BITS_PER_GROUP = GROUP_BYTES * 8
+    current_group_bytes = GROUP_BYTES
+    BITS_PER_GROUP = current_group_bytes * 8
     total_bits = int(value_int)
     if total_bits < 0:
         return jsonify(error='invalid_value'), 400
