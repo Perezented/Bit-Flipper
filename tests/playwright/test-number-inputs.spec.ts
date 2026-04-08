@@ -26,6 +26,7 @@ test.describe('Bit Flipper number input tests', () => {
   test('inputting 1 bit shows 1 partial byte', async ({ page }) => {
     await page.goto('/');
     await page.selectOption('#mode', 'bitcount');
+    await page.selectOption('#unit-select', 'bits');
     const input = page.locator('#number-input');
     await input.fill('1');
     const bytes = page.locator('.byte');
@@ -37,6 +38,7 @@ test.describe('Bit Flipper number input tests', () => {
   test('inputting 7 bits shows 1 partial byte', async ({ page }) => {
     await page.goto('/');
     await page.selectOption('#mode', 'bitcount');
+    await page.selectOption('#unit-select', 'bits');
     const input = page.locator('#number-input');
     await input.fill('7');
     const bytes = page.locator('.byte');
@@ -48,6 +50,7 @@ test.describe('Bit Flipper number input tests', () => {
   test('inputting non-multiple of 8 bits shows correct bytes and partial byte', async ({ page }) => {
     await page.goto('/');
     await page.selectOption('#mode', 'bitcount');
+    await page.selectOption('#unit-select', 'bits');
     const input = page.locator('#number-input');
     await input.fill('1030');
     const bytes = page.locator('.byte');

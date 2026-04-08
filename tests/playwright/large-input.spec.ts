@@ -4,9 +4,8 @@ test.describe('Bit Flipper large input rendering', () => {
   test('chunked rendering shows loader and completes for large inputs', async ({ page }) => {
     await page.goto('/');
     const input = page.locator('#number-input');
-    // treat the input as a bitcount -> large value will render via chunked path
-    // ensure we're in bitcount mode
     await page.selectOption('#mode', 'bitcount');
+    await page.selectOption('#unit-select', 'bits');
     await input.fill('500000000');
 
     // loader should appear then hide once finished, and we should have the KB
@@ -32,6 +31,7 @@ test.describe('Bit Flipper large input rendering', () => {
   test('MB-level canvas renders for large inputs', async ({ page }) => {
     await page.goto('/');
     await page.selectOption('#mode', 'bitcount');
+    await page.selectOption('#unit-select', 'bits');
     const input = page.locator('#number-input');
     // 20 MB -> 20 * (8192 bits * 1024 KB) = 167772160 bits
     await input.fill('167772160');
@@ -50,6 +50,7 @@ test.describe('Bit Flipper large input rendering', () => {
   test('very large bitcount (500M bits) renders MB groups ~60', async ({ page }) => {
     await page.goto('/');
     await page.selectOption('#mode', 'bitcount');
+    await page.selectOption('#unit-select', 'bits');
     const input = page.locator('#number-input');
     await input.fill('500000000');
     // loader check removed, optimized MB rendering should be fast enough
@@ -63,6 +64,7 @@ test.describe('Bit Flipper large input rendering', () => {
   test('inputting 2kb worth of bits shows correct KB groups and bytes, then updating input should update canvas count', async ({ page }) => {
     await page.goto('/');
     await page.selectOption('#mode', 'bitcount');
+    await page.selectOption('#unit-select', 'bits');
     const input = page.locator('#number-input');
     // 2 KB = 2 * 8192 = 16384 bits
     await input.fill('16384');
@@ -113,6 +115,7 @@ test.describe('Bit Flipper large input rendering', () => {
   test('repeatedly updating input with KB values updates KB canvas count without regression', async ({ page }) => {
     await page.goto('/');
     await page.selectOption('#mode', 'bitcount');
+    await page.selectOption('#unit-select', 'bits');
     const input = page.locator('#number-input');
     const kbs = page.locator('.kb-block');
 
@@ -169,16 +172,19 @@ test.describe('Bit Flipper large input rendering', () => {
     const unitSelect = page.locator('#unit-select');
     const mode = page.locator('#mode');
 
-    // By default binary mode should be selected and unit select hidden
-    await expect(mode).toHaveValue('binary');
-    await expect(unitSelect).toBeHidden();
-    await expect(inputLabel).toHaveText('Enter bit count:');
+    // By default bitcount mode should be selected and unit select visible
+    await expect(mode).toHaveValue('bitcount');
+    await expect(unitSelect).toBeVisible();
+    await expect(inputLabel).toHaveText('Enter MB count');
 
-    // Switch to bitcount and ensure unitSelect visible and label updates
+    // Switch to binary and ensure unitSelect hidden and label updates
+    await page.selectOption('#mode', 'binary');
+    await expect(unitSelect).toBeHidden();
+    await expect(inputLabel).toHaveText('Enter integer');
+
+    // Switch back to bitcount
     await page.selectOption('#mode', 'bitcount');
     await expect(unitSelect).toBeVisible();
-    // default unit 'bits' should use bit label
-    await expect(inputLabel).toHaveText('Enter bit count:');
 
     // change unit to KB and check label
     await page.selectOption('#unit-select', 'KB');
@@ -187,6 +193,7 @@ test.describe('Bit Flipper large input rendering', () => {
   test('repeatedly updating input with MB values updates MB canvas count without regression', async ({ page }) => {
     await page.goto('/');
     await page.selectOption('#mode', 'bitcount');
+    await page.selectOption('#unit-select', 'bits');
     const input = page.locator('#number-input');
     const mbs = page.locator('.mb-block');
     // deterministic pseudo-random sequence so the test is repeatable
@@ -209,6 +216,7 @@ test.describe('Bit Flipper large input rendering', () => {
   test('repeatedly updating input with GB values updates GB canvas count without regression', async ({ page }) => {
     await page.goto('/');
     await page.selectOption('#mode', 'bitcount');
+    await page.selectOption('#unit-select', 'bits');
     const input = page.locator('#number-input');
     const gbs = page.locator('.gb-block');
     // deterministic pseudo-random sequence so the test is repeatable

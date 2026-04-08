@@ -39,6 +39,17 @@
     if (DEBUG_RENDER) console.log('ui-init-unit', { mode, hidden: hide, parentClass: unitSelect.parentElement.className });
   }
 
+  // Initialize the input label to reflect the starting mode and unit
+  if (inputLabel) {
+    if (mode === 'bitcount') {
+      if (unit === 'bits') inputLabel.textContent = 'Enter bit count:';
+      else if (unit === 'bytes') inputLabel.textContent = 'Enter byte count';
+      else inputLabel.textContent = `Enter ${unit} count`;
+    } else {
+      inputLabel.textContent = 'Enter integer';
+    }
+  }
+
   // Keep last bits to animate differences
   let lastBits = [];
 
