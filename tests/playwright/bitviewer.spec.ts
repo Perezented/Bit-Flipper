@@ -5,6 +5,7 @@ test.describe('Bit Flipper bit viewer tests', () => {
     await page.goto('/');
     // ensure we're in bitcount mode
     await page.selectOption('#mode', 'bitcount');
+    await page.selectOption('#unit-select', 'bits');
     const input = page.locator('#number-input');
     await input.fill('1024');
     // wait for rendered bytes to appear
@@ -15,6 +16,7 @@ test.describe('Bit Flipper bit viewer tests', () => {
   test('toggling mode resets input and clears bytes', async ({ page }) => {
     await page.goto('/');
     await page.selectOption('#mode', 'bitcount');
+    await page.selectOption('#unit-select', 'bits');
     const input = page.locator('#number-input');
     await input.fill('1024');
     const bytes = page.locator('.byte');

@@ -1,22 +1,31 @@
-from flask import Flask, send_from_directory, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify
 import os
-from typing import List, Dict, Any
+
 
 app = Flask(__name__, static_folder='static', template_folder='static')
 
+
 # Configuration Constants
-GROUP_BYTES = int(os.environ.get('GROUP_BYTES', 1024))
+def _get_group_bytes() -> int:
+    default_group_bytes = 1024
+    raw_value = os.environ.get('GROUP_BYTES', str(default_group_bytes))
+    try:
+        group_bytes = int(raw_value)
+    except (TypeError, ValueError):
+        return default_group_bytes
+    if group_bytes <= 0:
+        return default_group_bytes
+    return group_bytes
+
+
+GROUP_BYTES = _get_group_bytes()
 BITS_PER_GROUP = GROUP_BYTES * 8
+
 
 @app.route('/')
 def index() -> str:
     return render_template('index.html')
 
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
-    app.run(host='0.0.0.0', port=port, debug=debug)
 
 @app.route('/api/group_summary', methods=['POST'])
 def group_summary():
@@ -37,9 +46,6 @@ def group_summary():
     if mode != 'bitcount':
         return jsonify(error='mode_not_supported'), 400
 
-    # constants should match the client (1024 bytes => 8192 bits per KB)
-    current_group_bytes = GROUP_BYTES
-    BITS_PER_GROUP = current_group_bytes * 8
     total_bits = int(value_int)
     if total_bits < 0:
         return jsonify(error='invalid_value'), 400
@@ -53,4 +59,10 @@ def group_summary():
         frac = ones / BITS_PER_GROUP
         groups.append(round(frac, 6))
 
-    return jsonify({ 'group_count': group_count, 'kb_fractions': groups })
+    return jsonify({'group_count': group_count, 'kb_fractions': groups})
+
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_DEBUG', 'False').strip().lower() in {'1', 'true', 'yes', 'on'}
+    app.run(host='0.0.0.0', port=port, debug=debug)

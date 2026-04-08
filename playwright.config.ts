@@ -5,7 +5,7 @@ export default defineConfig({
   timeout: 120000,
   expect: { timeout: 5000 },
   webServer: {
-    command: 'python app.py',
+    command: '.venv/bin/python app.py',
     port: 5000,
     cwd: process.cwd(),
     timeout: 120000,
